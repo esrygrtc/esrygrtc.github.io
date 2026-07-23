@@ -10,12 +10,20 @@ const SFX_KEYS = [
   'ui_whoosh', 'morph',
 ];
 
+const PEAK_DECAY_MS = 250;
+
 export function createSfx() {
   const muted = localStorage.getItem('copdoku_muted') === '1';
-  return { ctx: null, master: null, muted, unlocked: false, buffers: {}, gain: 0.9 };
+  const sfx = {
+    ctx: null, master: null, muted, unlocked: false, buffers: {}, gain: 0.9,
+    loaded: [], failed: [],
+    _lastEventTag: '', _eventCount: 0,
+    _peakRms: 0, _peakTs: 0,
+  };
+  return sfx;
 }
 
-/** Decode all 14 mp3s once, attach analyser chain, expose to CDP probe. */
+/** Decode all 14 mp3s once, attach analyser chain, expose callable probe. */
 async function _unlock(sfx) {
   if (sfx.unlocked) return;
   try {
@@ -36,23 +44,26 @@ async function _unlock(sfx) {
       })
     );
 
-    const decodes = [];
     for (const r of results) {
       if (r.status === 'fulfilled') {
-        decodes.push(
-          sfx.ctx.decodeAudioData(r.value.buf).then((ab) => ({ key: r.value.key, ab }))
-        );
+        sfx.loaded.push(r.value.key);
+        try {
+          const ab = await sfx.ctx.decodeAudioData(r.value.buf);
+          sfx.buffers[r.value.key] = ab;
+        } catch (e) {
+          sfx.failed.push(r.value.key);
+        }
+      } else {
+        const key = SFX_KEYS.find((k) => r.reason.message.startsWith(`${k}:`)) || r.reason.message;
+        sfx.failed.push(key);
       }
-    }
-    const decoded = await Promise.allSettled(decodes);
-    for (const d of decoded) {
-      if (d.status === 'fulfilled') sfx.buffers[d.value.key] = d.value.ab;
     }
 
     sfx.unlocked = true;
-    window.__copdokuAudioProbe = sfx; // VERITY CDP probe hook
+    window.__copdokuAudioProbe = () => _probe(sfx);
   } catch (e) {
     // audio unavailable — game must never crash on sound
+    window.__copdokuAudioProbe = () => _probe(sfx); // probe still callable
   }
 }
 
@@ -62,7 +73,37 @@ export function sfxUnlock(sfx) {
   return _unlockPromise;
 }
 
-function _play(sfx, key, gainDb = 0, delayMs = 0) {
+function _readPeak(sfx) {
+  if (!sfx.analyser) return 0;
+  const data = new Float32Array(sfx.analyser.fftSize);
+  sfx.analyser.getFloatTimeDomainData(data);
+  let sum = 0;
+  for (let i = 0; i < data.length; i++) sum += data[i] * data[i];
+  return Math.sqrt(sum / data.length);
+}
+
+function _probe(sfx) {
+  const raw = _readPeak(sfx);
+  const now = performance.now();
+  const dt = sfx._peakTs ? (now - sfx._peakTs) : PEAK_DECAY_MS;
+  const alpha = Math.exp(-dt / PEAK_DECAY_MS);
+  sfx._peakRms = Math.max(raw, sfx._peakRms * alpha);
+  sfx._peakTs = now;
+  return {
+    ctxState: sfx.ctx ? sfx.ctx.state : 'closed',
+    sampleRate: sfx.ctx ? sfx.ctx.sampleRate : 0,
+    peakRms: sfx._peakRms,
+    lastEventTag: sfx._lastEventTag,
+    eventCount: sfx._eventCount,
+  };
+}
+
+function _tag(sfx, tag) {
+  sfx._lastEventTag = tag;
+  sfx._eventCount++;
+}
+
+function _play(sfx, key, tag, gainDb = 0, delayMs = 0) {
   if (!sfx.unlocked || sfx.muted) return;
   const buf = sfx.buffers[key];
   if (!buf) return;
@@ -73,6 +114,7 @@ function _play(sfx, key, gainDb = 0, delayMs = 0) {
   g.gain.setValueAtTime(Math.pow(10, gainDb / 20), t0);
   src.connect(g); g.connect(sfx.master);
   src.start(t0);
+  _tag(sfx, tag);
 }
 
 export function sfxToggleMute(sfx) {
@@ -84,19 +126,19 @@ export function sfxToggleMute(sfx) {
 // ---- DESIGNED EVENTS (§4.6) ----
 export const sfxAck = () => {}; // T0: silent (PULSE row 1) — outcome sounds carry audio
 
-export function sfxMark(sfx)      { _play(sfx, 'x_mark'); }
-export function sfxPlace(sfx)     { _play(sfx, 'place'); }
-export function sfxCascade(sfx)   { _play(sfx, 'cascade_tick'); }
+export function sfxMark(sfx)      { _play(sfx, 'x_mark', 'mark'); }
+export function sfxPlace(sfx)     { _play(sfx, 'place', 'place'); }
+export function sfxCascade(sfx)   { _play(sfx, 'cascade_tick', 'cascade'); }
 export const sfxBlocked = () => {}; // row 10 SILENT (PULSE v5)
-export function sfxWrong(sfx)     { _play(sfx, 'heart_loss'); }
-export function sfxRegion(sfx)    { _play(sfx, 'region'); }
-export function sfxCatch(sfx)     { _play(sfx, 'catch_spot'); }
-export function sfxUi(sfx)        { _play(sfx, 'ui_whoosh'); }
+export function sfxWrong(sfx)     { _play(sfx, 'heart_loss', 'wrong'); }
+export function sfxRegion(sfx)    { _play(sfx, 'region', 'region'); }
+export function sfxCatch(sfx)     { _play(sfx, 'catch_spot', 'catch'); }
+export function sfxUi(sfx)        { _play(sfx, 'ui_whoosh', 'ui'); }
 
 // #143 stage-2 (wired now, called when client runtime lands)
-export function sfxMorph(sfx)         { _play(sfx, 'morph'); }
-export function sfxCatchRush(sfx)     { _play(sfx, 'catch_rush'); }
-export function sfxCatchCuff(sfx)     { _play(sfx, 'catch_cuff'); }
-export function sfxCatchResolve(sfx)  { _play(sfx, 'catch_resolve'); }
-export function sfxSolveRise(sfx)     { _play(sfx, 'solve_rise'); }
-export function sfxFadeDiag(sfx)      { _play(sfx, 'cascade_diag'); }
+export function sfxMorph(sfx)         { _play(sfx, 'morph', 'morph'); }
+export function sfxCatchRush(sfx)     { _play(sfx, 'catch_rush', 'catch_rush'); }
+export function sfxCatchCuff(sfx)     { _play(sfx, 'catch_cuff', 'catch_cuff'); }
+export function sfxCatchResolve(sfx)  { _play(sfx, 'catch_resolve', 'catch_resolve'); }
+export function sfxSolveRise(sfx)     { _play(sfx, 'solve_rise', 'solve_rise'); }
+export function sfxFadeDiag(sfx)      { _play(sfx, 'cascade_diag', 'cascade_diag'); }
