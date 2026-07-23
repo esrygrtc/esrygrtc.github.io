@@ -39,7 +39,7 @@
       ],
       "tier": "L1",
       "thiefCell": {
-        "r": 0,
+        "r": 1,
         "c": 1
       },
       "teaches": "region"
@@ -139,8 +139,8 @@
       ],
       "tier": "L1",
       "thiefCell": {
-        "r": 1,
-        "c": 1
+        "r": 2,
+        "c": 2
       },
       "teaches": "no-touch diagonal"
     }
