@@ -1,0 +1,61 @@
+{
+  "generated_at": 1784815230,
+  "sfx": {
+    "x_mark": {
+      "sha256": "3442049384d526c12b4127d91a4181771cf5962044e0ff638334bae7b8994439",
+      "bytes": 1925
+    },
+    "place": {
+      "sha256": "d25c6aa9e856f58a7d981bb1badc922401a2c5b94a47fb9f89b551f664dda162",
+      "bytes": 2552
+    },
+    "cascade_tick": {
+      "sha256": "9eee3d4273233a9442e8924b5ccb84027e1739c4c1e17ccab22c54ca9c5c6bad",
+      "bytes": 1612
+    },
+    "cascade_diag": {
+      "sha256": "08fc1074104064b7c2ea4bb2a88030d52a851c14015d1910519b03dcef948baf",
+      "bytes": 1925
+    },
+    "region": {
+      "sha256": "77b820adf2ee6912530a7bf098e44b4e02df60a455ae3e66ddbc3268364a2916",
+      "bytes": 3493
+    },
+    "solve_rise": {
+      "sha256": "53f567491d876e089d659332fbfc18ba2264fe0562311ff5983a956742c24424",
+      "bytes": 5060
+    },
+    "catch_spot": {
+      "sha256": "e3ba77121329f1766d9ac5bc4bf451d1eeb5e5cfb1e038193b2709c1485ea16a",
+      "bytes": 3806
+    },
+    "catch_rush": {
+      "sha256": "30c90f21e5518707e5eb9979d275ad148c8333bb0cdbbc8a1da8c49031bd6a5b",
+      "bytes": 5060
+    },
+    "catch_cuff": {
+      "sha256": "51dbc0516ab3066d09933279a0b8286a03bd22dc89f12ba6699c85d5f4be32b4",
+      "bytes": 2239
+    },
+    "catch_resolve": {
+      "sha256": "e692f21a58ed2fbb7a6dfe13f656773895e2d142a465d8bce4ce441c11cb3074",
+      "bytes": 2552
+    },
+    "heart_loss": {
+      "sha256": "a5128ce53eea49d31873254fb96f7d7fce2fbfb13a3b9dd8f7a15821b6244cd3",
+      "bytes": 3493
+    },
+    "fail": {
+      "sha256": "969c86959dfd2218b1ec3270087ace7aa199826c7b39817e52ee7b96299bb79d",
+      "bytes": 3806
+    },
+    "ui_whoosh": {
+      "sha256": "4b19dd9a5dfe1ce6a3056c70960aa25f5dbd6d5166405e5bf309a8cbda10e557",
+      "bytes": 2552
+    },
+    "morph": {
+      "sha256": "aad809ee1e62a2e903c853defc0482370d834c41ec27b351d799cc184f571e98",
+      "bytes": 7881
+    }
+  }
+}
