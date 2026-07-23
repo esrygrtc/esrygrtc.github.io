@@ -29,7 +29,7 @@ async function _unlock(sfx) {
 
     const results = await Promise.allSettled(
       SFX_KEYS.map(async (key) => {
-        const resp = await fetch(`audio/sfx_${key}.mp3`);
+        const resp = await fetch(`audio/sfx/${key}.mp3`);
         if (!resp.ok) throw new Error(`${key}: HTTP ${resp.status}`);
         const buf = await resp.arrayBuffer();
         return { key, buf };
@@ -50,7 +50,7 @@ async function _unlock(sfx) {
     }
 
     sfx.unlocked = true;
-    window.__copdokuSfx = sfx; // VERITY CDP probe hook
+    window.__copdokuAudioProbe = sfx; // VERITY CDP probe hook
   } catch (e) {
     // audio unavailable — game must never crash on sound
   }
@@ -87,7 +87,7 @@ export const sfxAck = () => {}; // T0: silent (PULSE row 1) — outcome sounds c
 export function sfxMark(sfx)      { _play(sfx, 'x_mark'); }
 export function sfxPlace(sfx)     { _play(sfx, 'place'); }
 export function sfxCascade(sfx)   { _play(sfx, 'cascade_tick'); }
-export function sfxBlocked(sfx)   { _play(sfx, 'fail'); }
+export const sfxBlocked = () => {}; // row 10 SILENT (PULSE v5)
 export function sfxWrong(sfx)     { _play(sfx, 'heart_loss'); }
 export function sfxRegion(sfx)    { _play(sfx, 'region'); }
 export function sfxCatch(sfx)     { _play(sfx, 'catch_spot'); }
