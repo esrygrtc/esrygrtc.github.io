@@ -2,8 +2,11 @@
 // Lazy-unlocked on first pointerdown (iOS autoplay policy). Mute toggle
 // persisted to localStorage (Meowdoku top-5 complaint, #130 §4).
 // P8: sound is information — every gameplay event gets a designed sound.
-// #153 R3/R4/R5: fixed load-bookkeeping order, probe exposes loaded/failed,
+// #141 R3/R4/R5: fixed load-bookkeeping order, probe exposes loaded/failed,
 // continuous sampling driven by timer (not poll). §7.2.7 can-fail wired.
+// R3 disclosure: 50ms poll with 512-sample analyser window → ~21–23%
+// duty cycle (fftSize / sampleRate) / intervalMs. Sounds shorter than
+// the window (~11–12 ms) falling entirely between polls are invisible.
 
 const SFX_KEYS = [
   'x_mark', 'place', 'cascade_tick', 'cascade_diag',
@@ -13,7 +16,7 @@ const SFX_KEYS = [
 ];
 
 const WINDOW_MS = 250;
-const SAMPLE_INTERVAL_MS = 50; // ~20 Hz resolution — R3 disclosed
+const SAMPLE_INTERVAL_MS = 50; // poll rate; actual duty cycle ~21–23% (see header)
 
 export function createSfx() {
   const muted = localStorage.getItem('copdoku_muted') === '1';
