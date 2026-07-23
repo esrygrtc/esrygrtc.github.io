@@ -2,6 +2,8 @@
 // Lazy-unlocked on first pointerdown (iOS autoplay policy). Mute toggle
 // persisted to localStorage (Meowdoku top-5 complaint, #130 §4).
 // P8: sound is information — every gameplay event gets a designed sound.
+// #153 R3/R4/R5: fixed load-bookkeeping order, probe exposes loaded/failed,
+// continuous sampling driven by timer (not poll). §7.2.7 can-fail wired.
 
 const SFX_KEYS = [
   'x_mark', 'place', 'cascade_tick', 'cascade_diag',
@@ -11,6 +13,7 @@ const SFX_KEYS = [
 ];
 
 const WINDOW_MS = 250;
+const SAMPLE_INTERVAL_MS = 50; // ~20 Hz resolution — R3 disclosed
 
 export function createSfx() {
   const muted = localStorage.getItem('copdoku_muted') === '1';
@@ -18,9 +21,28 @@ export function createSfx() {
     ctx: null, master: null, muted, unlocked: false, buffers: {}, gain: 0.9,
     loaded: [], failed: [],
     _lastEventTag: '', _eventCount: 0,
-    _peakRms: 0, _peakTs: 0,
+    _peakRms: 0, _peakSinceLastPoll: 0, _rmsWindow: [], _sampleTimer: null,
   };
   return sfx;
+}
+
+function _startSampling(sfx) {
+  if (sfx._sampleTimer) return;
+  sfx._sampleTimer = setInterval(() => {
+    const rms = _readRms(sfx);
+    const now = performance.now();
+
+    // Rolling 250ms window for peakRms (same semantic as before)
+    sfx._rmsWindow.push({ t: now, rms });
+    const cutoff = now - WINDOW_MS;
+    while (sfx._rmsWindow.length && sfx._rmsWindow[0].t < cutoff) sfx._rmsWindow.shift();
+    let peak = 0;
+    for (const s of sfx._rmsWindow) if (s.rms > peak) peak = s.rms;
+    sfx._peakRms = peak;
+
+    // Peak since last probe read — reset by _probe() on each call
+    if (rms > sfx._peakSinceLastPoll) sfx._peakSinceLastPoll = rms;
+  }, SAMPLE_INTERVAL_MS);
 }
 
 /** Decode all 14 mp3s once, attach analyser chain, expose callable probe. */
@@ -35,6 +57,8 @@ async function _unlock(sfx) {
     sfx.master.connect(sfx.analyser);
     sfx.analyser.connect(sfx.ctx.destination);
 
+    _startSampling(sfx);
+
     const results = await Promise.allSettled(
       SFX_KEYS.map(async (key) => {
         const resp = await fetch(`audio/sfx/${key}.mp3`);
@@ -46,10 +70,11 @@ async function _unlock(sfx) {
 
     for (const r of results) {
       if (r.status === 'fulfilled') {
-        sfx.loaded.push(r.value.key);
+        // R5: push loaded only after successful decode — loaded ∩ failed === ∅
         try {
           const ab = await sfx.ctx.decodeAudioData(r.value.buf);
           sfx.buffers[r.value.key] = ab;
+          sfx.loaded.push(r.value.key);
         } catch (e) {
           sfx.failed.push(r.value.key);
         }
@@ -83,22 +108,19 @@ function _readRms(sfx) {
 }
 
 function _probe(sfx) {
-  const now = performance.now();
-  // push new sample
-  if (!sfx._rmsWindow) sfx._rmsWindow = [];
-  sfx._rmsWindow.push({ t: now, rms: _readRms(sfx) });
-  // discard samples older than 250ms
-  const cutoff = now - WINDOW_MS;
-  while (sfx._rmsWindow.length && sfx._rmsWindow[0].t < cutoff) sfx._rmsWindow.shift();
-  // peak over the window
-  let peak = 0;
-  for (const s of sfx._rmsWindow) if (s.rms > peak) peak = s.rms;
-  sfx._peakRms = peak;
-  sfx._peakTs = now;
+  // R3: peakSinceLastPoll captures max over continuous samples since last read,
+  // then resets. Sampling runs on a timer (50ms), not poll-driven.
+  const peakSinceLastPoll = sfx._peakSinceLastPoll || 0;
+  sfx._peakSinceLastPoll = 0;
+
+  // R4: loaded/failed now readable from the page
   return {
     ctxState: sfx.ctx ? sfx.ctx.state : 'closed',
     sampleRate: sfx.ctx ? sfx.ctx.sampleRate : 0,
-    peakRms: sfx._peakRms,
+    peakRms: sfx._peakRms || 0,
+    peakSinceLastPoll,
+    loaded: [...sfx.loaded],
+    failed: [...sfx.failed],
     lastEventTag: sfx._lastEventTag,
     eventCount: sfx._eventCount,
   };
