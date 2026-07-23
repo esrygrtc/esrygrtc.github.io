@@ -69,5 +69,47 @@
     "totalMaxMs": 300,
     "tier": 2
   },
-  "uiTransition": { "defaultMs": 200, "tier": 1 }
+  "uiTransition": { "defaultMs": 200, "tier": 1 },
+  "stageMorph": {
+    "morphVisualMs": 300,
+    "crossfadeMs": 200,
+    "markerFadeMs": 100,
+    "markerFadeStartAtMs": 150,
+    "sweepPerCellMs": 80,
+    "inputLockMaxMs": 200,
+    "ackBudgetMs": 50,
+    "easeCells": "ease-in-out cubic",
+    "easeReveal": "ease-out cubic",
+    "tier": 2,
+    "note": "PULSE v5 row 12 — board re-partition transition; X sweep is OVERRIDE of row 4, not reuse"
+  },
+  "thiefCatchTap": {
+    "concealFadeMs": 80,
+    "snapFlashMs": 60,
+    "settleMs": 110,
+    "totalMs": 250,
+    "snapPeakScale": 1.15,
+    "easeSnap": "ease-out cubic",
+    "easeSettle": "ease-in cubic",
+    "tier": 2,
+    "note": "PULSE v5 row 13 — cuff-snap micro-sting, distinct from row 3 officer-place"
+  },
+  "stage2Clear": {
+    "totalMs": 280,
+    "brightnessPeak": 1.18,
+    "tier": 3,
+    "note": "PULSE v5 row 14 — full-board bloom + brass resolve, scaled-down from row 7"
+  },
+  "wrongHideout": {
+    "rimFlashMs": 80,
+    "shakeMs": 60,
+    "shakeAmplitudePx": 2,
+    "shakeCycles": 2,
+    "heartDimDropMs": 180,
+    "heartDimDropDelayMs": 80,
+    "totalMaxMs": 250,
+    "rimColor": "amber",
+    "tier": 2,
+    "note": "PULSE v5 row 15 — gentler than row 8; amber not red, ±2px not ±3"
+  }
 }

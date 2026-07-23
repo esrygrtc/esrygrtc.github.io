@@ -6,5 +6,13 @@
   "designWidthPx": 390,
   "designHeightPx": 844,
   "markCostsHeart": false,
-  "blockedTapCostsHeart": false
+  "blockedTapCostsHeart": false,
+  "heartLossPauseMs": 1500,
+  "stage2": {
+    "thiefRatio": 0.5,
+    "heartsResetOnMorph": false,
+    "wrongHideoutCostsHeart": true,
+    "morphInputLockMaxMs": 200,
+    "morphAckBudgetMs": 50
+  }
 }
