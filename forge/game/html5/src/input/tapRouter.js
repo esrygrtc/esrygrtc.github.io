@@ -1,15 +1,24 @@
-// tapRouter.js — pointer → cell; ack dispatch; AMENDMENT 2 grammar (§4.1/§4.2).
+// tapRouter.js — pointer → cell; ack dispatch; AMENDMENT 2+6 grammar (§4.1/§4.2).
 // The ack fires from the pointerdown handler BEFORE gesture classification and
 // BEFORE any rules work: every tap acknowledges ≤50ms, including rejected
 // taps. The double-tap window delays the OUTCOME, never the acknowledgement.
+//
+// AMENDMENT 6 (SUPERSEDE grammar, PULSE v4):
+//   Tap 1 on EMPTY → mark tween starts immediately (≤50ms ack budget).
+//   Tap 1 on MARK  → erase DEFERRED to window-expiry (toggle-commit).
+//     Tap 2 within window → double-tap from MARK (supersede; erase canceled).
+//     Window expires → erase fires, 90ms reversed tween plays.
+//   Supersede-cancel (tap 2 inside window on a just-marked cell):
+//     in-flight mark tween killed same-frame (≤16ms, no penalty tween).
 
 import { RECT_SLOTS } from '../render/layout.js';
-import { fxAck, fxMark, fxPlace, fxCascade, fxRegionPulse, fxShake, fxHeartLoss } from '../render/fx.js';
+import { fxAck, fxMark, fxUnmark, fxPlace, fxCascade, fxRegionPulse, fxShake, fxBlockedPulse, fxHeartLoss, killTweenByCell, TW_MARK } from '../render/fx.js';
 import { markDirty } from '../render/boardRenderer.js';
 import {
   sfxMark, sfxPlace, sfxCascade, sfxBlocked, sfxWrong, sfxRegion, sfxUi, sfxUnlock,
 } from '../audio/sfx.js';
 import { onTap } from '../core/session.js';
+import { EMPTY, MARK, OFFICER, AUTO_X } from '../core/board.js';
 
 function buzz(pattern) {
   if (typeof navigator !== 'undefined' && navigator.vibrate) {
@@ -22,6 +31,27 @@ export function attachTapRouter(canvas, G) {
   // pointerdown within feel.doubleTapWindowMs → 'double'.
   let lastCell = -1;
   let lastDownMs = -1e9;
+
+  // AMENDMENT 6 — deferred toggle-commit erase for MARK cells.
+  // On tap 1 on a MARK cell, we do NOT erase immediately: the player might
+  // be starting a double-tap (which commits from MARK). The erase fires only
+  // when the double-tap window expires without a second tap.
+  let eraseTimerId = null;
+  let eraseCell = -1;
+
+  function firePendingErase() {
+    eraseTimerId = null;
+    if (eraseCell < 0) return;
+    // Guard: cell must still be MARK (a double-tap may have consumed it)
+    if (G.session.cellState[eraseCell] !== MARK) { eraseCell = -1; return; }
+    const n = G.board.n;
+    const r = (eraseCell / n) | 0;
+    const c = eraseCell % n;
+    const ev = onTap(G.session, r, c, 'single', G.tuning);
+    routeEvent(G, ev, eraseCell);
+    markDirty(G.renderer);
+    eraseCell = -1;
+  }
 
   const handler = (e) => {
     e.preventDefault();
@@ -70,21 +100,46 @@ export function attachTapRouter(canvas, G) {
     // (every input acknowledged), rules work is gated.
     if (G.clock < (G.inputLockedUntil || 0)) return;
 
-    // gesture classification (feel.doubleTapWindowMs — never hard-coded)
     const now = performance.now();
-    let gesture = 'single';
+    const n = G.board.n;
+
+    // --- gesture classification (feel.doubleTapWindowMs — never hard-coded) ---
     if (cellIdx === lastCell && now - lastDownMs <= G.feel.doubleTapWindowMs) {
-      gesture = 'double';
+      // DOUBLE-TAP — cancel any pending erase (supersede)
+      if (eraseTimerId !== null) { clearTimeout(eraseTimerId); eraseTimerId = null; eraseCell = -1; }
       lastDownMs = -1e9; // a third tap inside the window starts fresh
       lastCell = -1;
-    } else {
-      lastDownMs = now;
-      lastCell = cellIdx;
+      const ev = onTap(G.session, r, c, 'double', G.tuning);
+      routeEvent(G, ev, cellIdx);
+      markDirty(G.renderer);
+      return;
     }
 
-    const ev = onTap(G.session, r, c, gesture, G.tuning);
-    routeEvent(G, ev, cellIdx);
-    markDirty(G.renderer);
+    // FIRST TAP (potential single)
+    lastDownMs = now;
+    lastCell = cellIdx;
+
+    const st = G.session.cellState[cellIdx];
+
+    if (st === EMPTY) {
+      // Mark appears IMMEDIATELY (PULSE v4: "row 2's tween ALWAYS starts on
+      // tap 1 within the ≤50ms ack budget — NEVER wait for window expiry")
+      const ev = onTap(G.session, r, c, 'single', G.tuning);
+      routeEvent(G, ev, cellIdx);
+      markDirty(G.renderer);
+    } else if (st === MARK) {
+      // AMENDMENT 6 — DEFER erase to window-expiry (toggle-commit). If tap 2
+      // arrives inside the window, the double-tap commits from MARK and the
+      // erase is canceled (supersede). Mark stays visible until expiry.
+      if (eraseTimerId !== null) { clearTimeout(eraseTimerId); eraseCell = -1; }
+      eraseCell = cellIdx;
+      eraseTimerId = setTimeout(firePendingErase, G.feel.doubleTapWindowMs);
+    } else {
+      // OFFICER (terminal) or AUTO_X (blocked) — fire immediately
+      const ev = onTap(G.session, r, c, 'single', G.tuning);
+      routeEvent(G, ev, cellIdx);
+      markDirty(G.renderer);
+    }
   };
   canvas.addEventListener('pointerdown', handler, { passive: false });
   return handler;
@@ -108,8 +163,9 @@ function routeEvent(G, ev, cellIdx) {
       buzz(10);
       break;
     case 'erase':
-      // mark erased (free revision): instant disappear + T1 click — same
-      // sound as make (spec §4.6: "✕ mark (make or erase)")
+      // AMENDMENT 6 — toggle-commit mark-off: 90ms reversed tween (ONLY on
+      // window-expiry; supersede-cancel kills the mark same-frame with no tween)
+      fxUnmark(G.fx, cellIdx);
       sfxMark(G.sfx);
       buzz(10);
       break;
@@ -117,6 +173,8 @@ function routeEvent(G, ev, cellIdx) {
       // OFFICER is terminal in P1 — ack already fired; nothing else.
       break;
     case 'place': {
+      // SUPERSEDE: kill any in-flight mark tween on this cell (≤16ms same-frame)
+      killTweenByCell(G.fx, cellIdx, TW_MARK);
       fxPlace(G.fx, cellIdx);
       sfxPlace(G.sfx);
       buzz(18);
@@ -130,8 +188,9 @@ function routeEvent(G, ev, cellIdx) {
       break;
     }
     case 'blocked':
-      fxShake(G.fx, cellIdx);
-      sfxBlocked(G.sfx); // never above tier 1
+      // PULSE v4 row 10 — neutral scale pulse; NO shake, NO rim, NO heart
+      fxBlockedPulse(G.fx, cellIdx);
+      sfxBlocked(G.sfx); // T0 sub-light, SILENT per v4
       break;
     case 'wrong':
       fxHeartLoss(G.fx, cellIdx, ev.hearts);

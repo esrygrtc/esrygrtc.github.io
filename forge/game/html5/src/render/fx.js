@@ -37,8 +37,10 @@ export const TW_MARK = 1;       // x-mark fade+pop in (row 2)
 export const TW_PLACE = 2;      // officer drop + overshoot (row 3)
 export const TW_CASCADE = 3;    // auto-x pop per ring cell (row 4)
 export const TW_REGION = 4;     // region-complete brightness pulse (row 5)
-export const TW_SHAKE = 5;      // invalid/blocked/heart-loss shake (rows 8)
+export const TW_SHAKE = 5;      // heart-loss shake ±3px (row 8 ONLY — blocked uses TW_BLOCKED)
 export const TW_RIM = 6;        // heart-loss red rim flash (row 8)
+export const TW_BLOCKED = 7;    // blocked-tap neutral scale pulse (PULSE v4 row 10)
+export const TW_UNMARK = 8;     // toggle-commit mark-off reversed 90ms (AMENDMENT 6)
 
 // board-level fx ids (not per-cell)
 export const BF_BLOOM = 0;      // board-solve bloom (row 6)
@@ -153,10 +155,26 @@ export function fxRegionPulse(fx, board, regionId, n) {
   }
 }
 export function fxShake(fx, cellIdx) {
-  // blocked tap — interim FABLE row (AMENDMENT 2 §2.3): 80ms shake ±3px,
-  // 2 cycles, NO rim flash and NO heart animation (must not read as a heart)
-  const f = fx.feel.blockedTap;
+  // heart-loss shake (row 8 ONLY — blocked taps use fxBlockedPulse per v4)
+  const f = fx.feel.heartLoss;
   allocTween(fx, TW_SHAKE, cellIdx, fx.now, f.shakeMs, 0, f.shakeAmplitudePx * 100 + f.shakeCycles);
+}
+export function fxBlockedPulse(fx, cellIdx) {
+  // PULSE v4 row 10 — neutral scale pulse 1.00→1.08→1.00, NO shake, NO rim
+  allocTween(fx, TW_BLOCKED, cellIdx, fx.now, fx.feel.blockedTap.totalMs, 0);
+}
+export function fxUnmark(fx, cellIdx) {
+  // AMENDMENT 6 — toggle-commit mark-off: 90ms reversed (scale 1.0→0.6, opacity 1→0)
+  allocTween(fx, TW_UNMARK, cellIdx, fx.now, fx.feel.xMark.totalMs, 0);
+}
+export function killTweenByCell(fx, cellIdx, kind) {
+  // SUPERSEDE-cancel: kill in-flight tween of `kind` on `cellIdx` same-frame
+  for (let t = 0; t < MAX_TW; t++) {
+    if (fx.poolKind[t] === kind && fx.poolCell[t] === cellIdx) {
+      freeTween(fx, t);
+      return;
+    }
+  }
 }
 export function fxHeartLoss(fx, cellIdx, heartIndex) {
   const f = fx.feel.heartLoss;
@@ -178,7 +196,7 @@ export function fxFailFade(fx) {
   const b = BF_FAIL_FADE * 4;
   fx.boardFx[b] = 0;
   fx.boardFx[b + 1] = fx.now;
-  fx.boardFx[b + 2] = 250; // §4.5: 200–300 desaturate + settle
+  fx.boardFx[b + 2] = fx.feel.failState.desaturateMs;
 }
 // Thief catch timeline (row 7): spotlight → converge → snap → settle.
 // Skippable after skippableAfterMs; skip commits final state instantly.
@@ -244,8 +262,9 @@ export function fxUpdate(fx, nowMs) {
 
     if (local >= dur) {
       // tween done: restore baseline values
-      if (kind === TW_ACK || kind === TW_PLACE || kind === TW_CASCADE) cellFx[cb + FX_SCALE] = 1;
+      if (kind === TW_ACK || kind === TW_PLACE || kind === TW_CASCADE || kind === TW_BLOCKED) cellFx[cb + FX_SCALE] = 1;
       if (kind === TW_MARK || kind === TW_CASCADE) cellFx[cb + FX_GLYPH_OPACITY] = 1;
+      if (kind === TW_UNMARK) { cellFx[cb + FX_GLYPH_OPACITY] = 0; cellFx[cb + FX_SCALE] = 1; }
       if (kind === TW_REGION) cellFx[cb + FX_BRIGHT] = 1;
       if (kind === TW_SHAKE) cellFx[cb + FX_SHAKEX] = 0;
       if (kind === TW_RIM) cellFx[cb + FX_RIM] = 0;
@@ -283,6 +302,18 @@ export function fxUpdate(fx, nowMs) {
       const peak = feel.regionComplete.brightnessPeak;
       const v = p < 0.5 ? 2 * fx.easeBoard(p) : 2 * (1 - fx.easeBoard(p));
       cellFx[cb + FX_BRIGHT] = 1 + (peak - 1) * v;
+    } else if (kind === TW_BLOCKED) {
+      // PULSE v4 row 10 — 1.00→1.08 by pulseUpMs → back by totalMs; neutral
+      const f = feel.blockedTap;
+      const up = f.pulseUpMs / dur;
+      const peak = f.pulsePeak;
+      const v = p <= up ? fx.easeBoard(p / up) : 1 - fx.easeBoard((p - up) / (1 - up));
+      cellFx[cb + FX_SCALE] = 1 + (peak - 1) * v;
+    } else if (kind === TW_UNMARK) {
+      // AMENDMENT 6 — toggle-commit mark-off: reverse of TW_MARK
+      const e = fx.easeBoard(p);
+      cellFx[cb + FX_SCALE] = feel.xMark.scaleTo + (feel.xMark.scaleFrom - feel.xMark.scaleTo) * e;
+      cellFx[cb + FX_GLYPH_OPACITY] = feel.xMark.opacityTo + (feel.xMark.opacityFrom - feel.xMark.opacityTo) * e;
     } else if (kind === TW_SHAKE) {
       // amp/cycles packed at alloc from the OWNING feel row (blockedTap vs
       // heartLoss) — never cross-read a sibling row's constants (§11.2)
