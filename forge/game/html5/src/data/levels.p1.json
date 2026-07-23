@@ -1,0 +1,148 @@
+{
+  "meta": {
+    "issue": 141,
+    "pack": "p1-greybox",
+    "generator": "copdoku_spike.py",
+    "source_pool": "unique_boards_seed132.json",
+    "source_seed": 132,
+    "tier_source": "logic_tiers.json",
+    "baked_by": "bake_levels.py",
+    "board_count": 3
+  },
+  "levels": [
+    {
+      "id": "4x4#2",
+      "n": 4,
+      "regions": [
+        1,
+        1,
+        0,
+        0,
+        1,
+        1,
+        1,
+        2,
+        1,
+        1,
+        3,
+        2,
+        3,
+        3,
+        3,
+        2
+      ],
+      "solution": [
+        2,
+        0,
+        3,
+        1
+      ],
+      "tier": "L1",
+      "thiefCell": {
+        "r": 0,
+        "c": 1
+      },
+      "teaches": "region"
+    },
+    {
+      "id": "5x5#6",
+      "n": 5,
+      "regions": [
+        0,
+        0,
+        0,
+        0,
+        0,
+        1,
+        1,
+        0,
+        0,
+        0,
+        1,
+        1,
+        2,
+        3,
+        3,
+        4,
+        4,
+        4,
+        3,
+        3,
+        4,
+        4,
+        4,
+        3,
+        3
+      ],
+      "solution": [
+        3,
+        0,
+        2,
+        4,
+        1
+      ],
+      "tier": "L0",
+      "thiefCell": {
+        "r": 1,
+        "c": 1
+      },
+      "teaches": "row/column"
+    },
+    {
+      "id": "6x6#16",
+      "n": 6,
+      "regions": [
+        2,
+        1,
+        1,
+        1,
+        1,
+        0,
+        2,
+        3,
+        1,
+        3,
+        1,
+        3,
+        2,
+        3,
+        3,
+        3,
+        3,
+        3,
+        2,
+        2,
+        3,
+        3,
+        3,
+        3,
+        2,
+        4,
+        4,
+        4,
+        5,
+        5,
+        2,
+        4,
+        4,
+        4,
+        5,
+        5
+      ],
+      "solution": [
+        5,
+        2,
+        0,
+        3,
+        1,
+        4
+      ],
+      "tier": "L1",
+      "thiefCell": {
+        "r": 1,
+        "c": 1
+      },
+      "teaches": "no-touch diagonal"
+    }
+  ]
+}

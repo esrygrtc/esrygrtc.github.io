@@ -1,0 +1,32 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="theme-color" content="#10151f">
+<title>COPDOKU — P1 greybox (#141)</title>
+<style>
+  html, body {
+    margin: 0; padding: 0; height: 100%;
+    background: #0a0d14;
+    display: flex; align-items: center; justify-content: center;
+    overflow: hidden;
+  }
+  #game {
+    /* 390×844 logical, DPR-scaled by main.js. Fits any portrait phone. */
+    width: min(100vw, calc(100vh * 390 / 844));
+    height: min(100vh, calc(100vw * 844 / 390));
+    touch-action: manipulation;   /* no 300ms zoom delay (spec §4.1) */
+    user-select: none;
+    -webkit-user-select: none;
+    -webkit-tap-highlight-color: transparent;
+    display: block;
+  }
+</style>
+</head>
+<body>
+<canvas id="game" width="390" height="844"></canvas>
+<script type="module" src="src/main.js"></script>
+</body>
+</html>

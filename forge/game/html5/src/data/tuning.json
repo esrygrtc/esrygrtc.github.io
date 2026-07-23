@@ -1,0 +1,10 @@
+{
+  "hearts": 3,
+  "sideMarginPx": 16,
+  "minTapTargetPx": 44,
+  "gridGapPx": 2,
+  "designWidthPx": 390,
+  "designHeightPx": 844,
+  "markCostsHeart": false,
+  "blockedTapCostsHeart": false
+}

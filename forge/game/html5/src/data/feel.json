@@ -1,0 +1,57 @@
+{
+  "meta": {
+    "issue": 141,
+    "source": "game/design/motion/issue_141_p1_feel/P1_FEEL_ENVELOPE.md (PULSE, ab8cba18)",
+    "law": "transcribed verbatim per skills/game-feel/SKILL.md §6.2 — an improvised easing is a defect",
+    "note": "all timing constants live here; none may be hard-coded in JS (spec §11.2)"
+  },
+  "easing": {
+    "board": [0.215, 0.610, 0.355, 1.0],
+    "uiIn": [0.215, 0.610, 0.355, 1.0],
+    "uiOut": [0.550, 0.055, 0.675, 0.19]
+  },
+  "budgets": {
+    "ackFirstChangeMs": 50,
+    "ackFramesAt60": 3,
+    "uiTransitionMinMs": 150,
+    "uiTransitionMaxMs": 300,
+    "inputLockMaxMs": 600,
+    "targetFps": 60
+  },
+  "tapAck": { "scaleUpMs": 50, "totalMs": 90, "scalePeak": 1.06, "tier": 0 },
+  "xMark": { "totalMs": 90, "scaleFrom": 0.6, "scaleTo": 1.0, "opacityFrom": 0, "opacityTo": 1, "tier": 1 },
+  "officerPlace": { "dropMs": 150, "overshootAt": 90, "overshootScale": 1.12, "settleMs": 200, "tier": 2 },
+  "cascade": {
+    "ringStepMs": 70,
+    "cellPopMs": 120,
+    "batchRingsAtOrAbove": 8,
+    "totalMaxMs": 600,
+    "diagonalEmphasisDelayMs": 60,
+    "diagonalPopScaleBoost": 1.2,
+    "ringOrder": ["row", "column", "diagonals", "region"],
+    "tier": 1
+  },
+  "regionComplete": { "totalMs": 240, "brightnessPeak": 1.15, "tier": 2 },
+  "boardSolveBloom": { "peakMs": 150, "totalMs": 300, "brightnessPeak": 1.20, "tier": 2 },
+  "thiefCatch": {
+    "spotlightMs": 250,
+    "convergeMs": 350,
+    "cuffSnapMs": 150,
+    "settleMs": 150,
+    "totalMs": 900,
+    "skippableAfterMs": 500,
+    "inputLockMaxMs": 600,
+    "tier": 3
+  },
+  "heartLoss": {
+    "rimFlashMs": 100,
+    "shakeMs": 80,
+    "shakeAmplitudePx": 3,
+    "shakeCycles": 2,
+    "heartDimDropMs": 180,
+    "heartDimDropDelayMs": 100,
+    "totalMaxMs": 300,
+    "tier": 2
+  },
+  "uiTransition": { "defaultMs": 200, "tier": 1 }
+}
