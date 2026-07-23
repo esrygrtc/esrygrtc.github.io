@@ -18,6 +18,7 @@
     "inputLockMaxMs": 600,
     "targetFps": 60
   },
+  "doubleTapWindowMs": 300,
   "tapAck": { "scaleUpMs": 50, "totalMs": 90, "scalePeak": 1.06, "tier": 0 },
   "xMark": { "totalMs": 90, "scaleFrom": 0.6, "scaleTo": 1.0, "opacityFrom": 0, "opacityTo": 1, "tier": 1 },
   "officerPlace": { "dropMs": 150, "overshootAt": 90, "overshootScale": 1.12, "settleMs": 200, "tier": 2 },
@@ -42,6 +43,16 @@
     "skippableAfterMs": 500,
     "inputLockMaxMs": 600,
     "tier": 3
+  },
+  "blockedTap": {
+    "interim": true, "author": "FABLE",
+    "note": "AMENDMENT 2 §2.3 — PULSE row 10 replaces verbatim when it lands; must NOT read as heart-loss (no red rim, no heart animation, no sound above T1)",
+    "shakeMs": 80, "shakeAmplitudePx": 3, "shakeCycles": 2, "maxSoundTier": 1
+  },
+  "failState": {
+    "interim": true, "author": "FABLE",
+    "note": "AMENDMENT 2 §2.3 — PULSE row 11 replaces verbatim when it lands; dignity, not punishment",
+    "desaturateSettleMinMs": 200, "desaturateSettleMaxMs": 300, "retryToInteractiveMaxMs": 300
   },
   "heartLoss": {
     "rimFlashMs": 100,

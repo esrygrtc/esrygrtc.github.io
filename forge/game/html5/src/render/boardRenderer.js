@@ -361,7 +361,7 @@ function drawHud(R, fx, ui, muted) {
   } else {
     ctx.fillStyle = COL.textDim;
     ctx.font = '13px system-ui, sans-serif';
-    ctx.fillText('tap = ✕ mark · tap again = officer · tap officer = remove', W / 2, az.y + az.h / 2);
+    ctx.fillText('tap = ✕ mark · tap ✕ = erase · double-tap = officer', W / 2, az.y + az.h / 2);
   }
 }
 

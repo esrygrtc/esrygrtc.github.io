@@ -1,9 +1,17 @@
 // session.js — the only mutable state in the greybox (spec §3.3, §4.2, §4.5).
 // Pure state machine: no DOM, no timers. Render/audio consume the event
 // objects returned by onTap. Timing lives in feel.json, never here.
+//
+// AMENDMENT 2 §2.2 grammar (replaces the retired 3-state cycle):
+//   single tap  — EMPTY ⇄ MARK toggle, free in BOTH directions, never a heart
+//   double-tap  — commits OFFICER from EMPTY or MARK (mis-tap guard: a single
+//                 tap can never lose a heart)
+//   AUTO_X      — rejects both gestures (blocked), no heart ever
+//   OFFICER     — terminal in P1: ack-only, no transitions
+// unplace/recomputeElimination are gone — only correct officers ever land.
 
 import { EMPTY, MARK, OFFICER, AUTO_X } from './board.js';
-import { eliminationGroups, recomputeElimination, completedRegions } from './rules.js';
+import { eliminationGroups, completedRegions } from './rules.js';
 
 export function createSession(board, tuning) {
   return {
@@ -17,36 +25,36 @@ export function createSession(board, tuning) {
   };
 }
 
-// spec §4.2 — exact placement resolution order. The ack (step 1) is fired by
-// the input layer BEFORE calling onTap; this function starts at step 2.
-export function onTap(session, r, c, tuning) {
+// spec §4.2 (AMENDMENT 2) — exact placement resolution order. The ack is
+// fired by the input layer BEFORE gesture classification and BEFORE calling
+// onTap; this function starts at step 1 with gesture ∈ 'single' | 'double'.
+export function onTap(session, r, c, gesture, tuning) {
   const board = session.board;
   const n = board.n;
   const idx = r * n + c;
 
+  // 1. not playing → ignored
   if (session.status !== 'playing') return { type: 'ignored', hearts: session.hearts, status: session.status };
 
   const st = session.cellState[idx];
 
-  // step 3 — BLOCKED: system-crossed cell. No heart, ever (P7 legibility).
+  // 2. BLOCKED: system-crossed cell rejects both gestures. No heart, ever.
   if (st === AUTO_X) return { type: 'blocked', cell: { r, c }, hearts: session.hearts, status: session.status };
 
-  // step 4 — EMPTY → MARK. No heart, ever (AC#5).
-  if (st === EMPTY) {
-    session.cellState[idx] = MARK;
-    return { type: 'mark', cell: { r, c }, hearts: session.hearts, status: session.status };
-  }
+  // 3. OFFICER is terminal in P1 — ack only, nothing else.
+  if (st === OFFICER) return { type: 'terminal', cell: { r, c }, hearts: session.hearts, status: session.status };
 
-  // cycle close — OFFICER → EMPTY. Frees the elimination this officer caused.
-  if (st === OFFICER) {
+  // 4. single tap — TOGGLE EMPTY ⇄ MARK. Free in either direction (AC#5).
+  if (gesture === 'single') {
+    if (st === EMPTY) {
+      session.cellState[idx] = MARK;
+      return { type: 'mark', cell: { r, c }, hearts: session.hearts, status: session.status };
+    }
     session.cellState[idx] = EMPTY;
-    session.placedCount--;
-    recomputeElimination(board, session.cellState);
-    session.announced = new Set(completedRegions(board, session.cellState));
-    return { type: 'unplace', cell: { r, c }, hearts: session.hearts, status: session.status };
+    return { type: 'erase', cell: { r, c }, hearts: session.hearts, status: session.status };
   }
 
-  // step 5/6 — MARK → attempt OFFICER. AD-4: direct comparison to solution.
+  // 5. double-tap — attempt OFFICER from EMPTY or MARK (AD-4: direct compare)
   if (c === board.solution[r]) {
     session.cellState[idx] = OFFICER;
     session.placedCount++;
@@ -64,7 +72,8 @@ export function onTap(session, r, c, tuning) {
     };
   }
 
-  // WRONG — costs exactly one heart; cell returns to MARK (it was MARK).
+  // WRONG — costs exactly one heart; cell returns to its PRE-TAP state
+  // (untouched here: we never mutated it). T2 muted feedback, never heavy.
   session.hearts--;
   if (session.hearts === 0) session.status = 'failed';
   return { type: 'wrong', cell: { r, c }, hearts: session.hearts, status: session.status };

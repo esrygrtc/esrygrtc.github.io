@@ -97,7 +97,7 @@ export function fxLoadLevel(fx, n) {
   fx.activeCount = 0;
 }
 
-function allocTween(fx, kind, cell, start, dur, delay) {
+function allocTween(fx, kind, cell, start, dur, delay, aux) {
   for (let t = 0; t < MAX_TW; t++) {
     if (fx.poolKind[t] === -1) {
       const b = t * 8;
@@ -106,6 +106,7 @@ function allocTween(fx, kind, cell, start, dur, delay) {
       fx.pool[b] = start;
       fx.pool[b + 1] = dur;
       fx.pool[b + 2] = delay;
+      fx.pool[b + 3] = aux || 0;
       fx.activeCount++;
       return t;
     }
@@ -152,13 +153,15 @@ export function fxRegionPulse(fx, board, regionId, n) {
   }
 }
 export function fxShake(fx, cellIdx) {
-  const f = fx.feel.heartLoss;
-  allocTween(fx, TW_SHAKE, cellIdx, fx.now, f.shakeMs, 0);
+  // blocked tap — interim FABLE row (AMENDMENT 2 §2.3): 80ms shake ±3px,
+  // 2 cycles, NO rim flash and NO heart animation (must not read as a heart)
+  const f = fx.feel.blockedTap;
+  allocTween(fx, TW_SHAKE, cellIdx, fx.now, f.shakeMs, 0, f.shakeAmplitudePx * 100 + f.shakeCycles);
 }
 export function fxHeartLoss(fx, cellIdx, heartIndex) {
   const f = fx.feel.heartLoss;
   allocTween(fx, TW_RIM, cellIdx, fx.now, f.rimFlashMs, 0);
-  allocTween(fx, TW_SHAKE, cellIdx, fx.now, f.shakeMs, 0);
+  allocTween(fx, TW_SHAKE, cellIdx, fx.now, f.shakeMs, 0, f.shakeAmplitudePx * 100 + f.shakeCycles);
   const b = BF_HEART * 4;
   fx.boardFx[b] = 0; // progress 0..1
   fx.boardFx[b + 1] = fx.now + f.heartDimDropDelayMs;
@@ -281,9 +284,11 @@ export function fxUpdate(fx, nowMs) {
       const v = p < 0.5 ? 2 * fx.easeBoard(p) : 2 * (1 - fx.easeBoard(p));
       cellFx[cb + FX_BRIGHT] = 1 + (peak - 1) * v;
     } else if (kind === TW_SHAKE) {
-      const f = feel.heartLoss;
-      const cycles = f.shakeCycles;
-      cellFx[cb + FX_SHAKEX] = f.shakeAmplitudePx * Math.sin(p * cycles * 2 * Math.PI) * (1 - p);
+      // amp/cycles packed at alloc from the OWNING feel row (blockedTap vs
+      // heartLoss) — never cross-read a sibling row's constants (§11.2)
+      const packed = fx.pool[b + 3];
+      const amp = Math.floor(packed / 100), cycles = packed - amp * 100;
+      cellFx[cb + FX_SHAKEX] = amp * Math.sin(p * cycles * 2 * Math.PI) * (1 - p);
     } else if (kind === TW_RIM) {
       cellFx[cb + FX_RIM] = 1 - fx.easeBoard(p);
     }

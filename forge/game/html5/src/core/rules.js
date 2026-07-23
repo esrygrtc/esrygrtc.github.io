@@ -54,31 +54,8 @@ export function eliminationGroups(board, cellState, r, c) {
 // Recompute ALL AUTO_X from the placed officers. AUTO_X is derived state:
 // removing an officer frees the cells it alone eliminated (spec §4.3 model).
 // MARK and OFFICER cells are never touched.
-export function recomputeElimination(board, cellState) {
-  const n = board.n;
-  for (let i = 0; i < n * n; i++) if (cellState[i] === AUTO_X) cellState[i] = EMPTY;
-  for (let r = 0; r < n; r++) {
-    for (let c = 0; c < n; c++) {
-      if (cellState[r * n + c] !== OFFICER) continue;
-      const reg = board.regions[r * n + c];
-      for (let k = 0; k < n; k++) {
-        if (cellState[r * n + k] === EMPTY) cellState[r * n + k] = AUTO_X;
-        if (cellState[k * n + c] === EMPTY) cellState[k * n + c] = AUTO_X;
-      }
-      for (let dr = -1; dr <= 1; dr++) {
-        for (let dc = -1; dc <= 1; dc++) {
-          const i = r + dr, j = c + dc;
-          if (i >= 0 && i < n && j >= 0 && j < n && cellState[i * n + j] === EMPTY) {
-            cellState[i * n + j] = AUTO_X;
-          }
-        }
-      }
-      for (let i = 0; i < n * n; i++) {
-        if (board.regions[i] === reg && cellState[i] === EMPTY) cellState[i] = AUTO_X;
-      }
-    }
-  }
-}
+// recomputeElimination removed (AMENDMENT 2 §2.2): OFFICER is terminal in P1,
+// so there is no unplace path and nothing to recompute.
 
 // Per-region coverage: a cell counts as resolved when it is not EMPTY
 // (officer, manual ✕, or auto ✕). Region complete ⇒ resolved === total.

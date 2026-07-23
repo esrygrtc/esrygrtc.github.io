@@ -1,6 +1,7 @@
-// tapRouter.js — pointer → cell; ack dispatch; 3-state cycle (spec §4.1/§4.2).
-// The ack fires from the pointerdown handler BEFORE any rules work (spec §4.2
-// step 1): every tap acknowledges ≤50ms, including rejected taps.
+// tapRouter.js — pointer → cell; ack dispatch; AMENDMENT 2 grammar (§4.1/§4.2).
+// The ack fires from the pointerdown handler BEFORE gesture classification and
+// BEFORE any rules work: every tap acknowledges ≤50ms, including rejected
+// taps. The double-tap window delays the OUTCOME, never the acknowledgement.
 
 import { RECT_SLOTS } from '../render/layout.js';
 import { fxAck, fxMark, fxPlace, fxCascade, fxRegionPulse, fxShake, fxHeartLoss } from '../render/fx.js';
@@ -17,6 +18,11 @@ function buzz(pattern) {
 }
 
 export function attachTapRouter(canvas, G) {
+  // gesture classification state (AMENDMENT 2 §4.1): same cell + second
+  // pointerdown within feel.doubleTapWindowMs → 'double'.
+  let lastCell = -1;
+  let lastDownMs = -1e9;
+
   const handler = (e) => {
     e.preventDefault();
     sfxUnlock(G.sfx); // iOS autoplay policy: unlock inside first pointerdown
@@ -53,7 +59,9 @@ export function attachTapRouter(canvas, G) {
     const r = (cellIdx / G.board.n) | 0;
     const c = cellIdx % G.board.n;
 
-    // spec §4.2 step 1 — ACK FIRST: visual pop + light haptic, SILENT (row 1)
+    // spec §4.2 — ACK FIRST, unconditional, before classification: visual pop
+    // + light haptic, SILENT (row 1: a sounded ack would double-fire on a
+    // double-tap).
     fxAck(G.fx, cellIdx);
     buzz(8);
     markDirty(G.renderer);
@@ -62,7 +70,19 @@ export function attachTapRouter(canvas, G) {
     // (every input acknowledged), rules work is gated.
     if (G.clock < (G.inputLockedUntil || 0)) return;
 
-    const ev = onTap(G.session, r, c, G.tuning);
+    // gesture classification (feel.doubleTapWindowMs — never hard-coded)
+    const now = performance.now();
+    let gesture = 'single';
+    if (cellIdx === lastCell && now - lastDownMs <= G.feel.doubleTapWindowMs) {
+      gesture = 'double';
+      lastDownMs = -1e9; // a third tap inside the window starts fresh
+      lastCell = -1;
+    } else {
+      lastDownMs = now;
+      lastCell = cellIdx;
+    }
+
+    const ev = onTap(G.session, r, c, gesture, G.tuning);
     routeEvent(G, ev, cellIdx);
     markDirty(G.renderer);
   };
@@ -86,6 +106,15 @@ function routeEvent(G, ev, cellIdx) {
       fxMark(G.fx, cellIdx);
       sfxMark(G.sfx);
       buzz(10);
+      break;
+    case 'erase':
+      // mark erased (free revision): instant disappear + T1 click — same
+      // sound as make (spec §4.6: "✕ mark (make or erase)")
+      sfxMark(G.sfx);
+      buzz(10);
+      break;
+    case 'terminal':
+      // OFFICER is terminal in P1 — ack already fired; nothing else.
       break;
     case 'place': {
       fxPlace(G.fx, cellIdx);
@@ -111,7 +140,6 @@ function routeEvent(G, ev, cellIdx) {
       G.inputLockedUntil = G.clock + G.tuning.heartLossPauseMs;
       if (ev.status === 'failed') G.onFail();
       break;
-    case 'unplace':
     case 'ignored':
     default:
       break;
