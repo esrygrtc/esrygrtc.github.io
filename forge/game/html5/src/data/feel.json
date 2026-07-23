@@ -1,7 +1,7 @@
 {
   "meta": {
     "issue": 141,
-    "source": "game/design/motion/issue_141_p1_feel/P1_FEEL_ENVELOPE.md (PULSE v4, f65553bc)",
+    "source": "game/design/motion/issue_141_p1_feel/P1_FEEL_ENVELOPE.md (PULSE v5, cc343d8a / blob 5558e871)",
     "law": "transcribed verbatim per skills/game-feel/SKILL.md §6.2 — an improvised easing is a defect",
     "note": "all timing constants live here; none may be hard-coded in JS (spec §11.2)"
   },
