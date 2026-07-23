@@ -10,7 +10,7 @@ const SFX_KEYS = [
   'ui_whoosh', 'morph',
 ];
 
-const PEAK_DECAY_MS = 250;
+const WINDOW_MS = 250;
 
 export function createSfx() {
   const muted = localStorage.getItem('copdoku_muted') === '1';
@@ -73,7 +73,7 @@ export function sfxUnlock(sfx) {
   return _unlockPromise;
 }
 
-function _readPeak(sfx) {
+function _readRms(sfx) {
   if (!sfx.analyser) return 0;
   const data = new Float32Array(sfx.analyser.fftSize);
   sfx.analyser.getFloatTimeDomainData(data);
@@ -83,11 +83,17 @@ function _readPeak(sfx) {
 }
 
 function _probe(sfx) {
-  const raw = _readPeak(sfx);
   const now = performance.now();
-  const dt = sfx._peakTs ? (now - sfx._peakTs) : PEAK_DECAY_MS;
-  const alpha = Math.exp(-dt / PEAK_DECAY_MS);
-  sfx._peakRms = Math.max(raw, sfx._peakRms * alpha);
+  // push new sample
+  if (!sfx._rmsWindow) sfx._rmsWindow = [];
+  sfx._rmsWindow.push({ t: now, rms: _readRms(sfx) });
+  // discard samples older than 250ms
+  const cutoff = now - WINDOW_MS;
+  while (sfx._rmsWindow.length && sfx._rmsWindow[0].t < cutoff) sfx._rmsWindow.shift();
+  // peak over the window
+  let peak = 0;
+  for (const s of sfx._rmsWindow) if (s.rms > peak) peak = s.rms;
+  sfx._peakRms = peak;
   sfx._peakTs = now;
   return {
     ctxState: sfx.ctx ? sfx.ctx.state : 'closed',
