@@ -10,53 +10,57 @@ import {
   boardFxValue,
 } from './fx.js';
 
-// Greybox visual language (spec §5): flat fills; region = fill + border
-// pattern, NEVER hue alone (#130 §4 accessibility rule). Each region pairs a
-// luminance-distinct fill with a distinct dash pattern on its perimeter.
+// Greybox visual language (spec §5 + CANVAS R1 sketch sheet, ef51bebd — the
+// renderer contract): region = fill + border pattern, NEVER hue alone.
+// 6 double-coded regions A–F; 3px stroke inset 1.5px inside own cells;
+// shared edge = two parallel patterned strokes (one per region, never overlap).
 const REGION_STYLE = [
-  { fill: '#26314a', edge: '#5a76c9', dash: [] },
-  { fill: '#2e4028', edge: '#71b25e', dash: [7, 4] },
-  { fill: '#473127', edge: '#d18a4f', dash: [2, 3] },
-  { fill: '#41263a', edge: '#c9669e', dash: [9, 3, 2, 3] },
-  { fill: '#23423f', edge: '#4fbcae', dash: [12, 4] },
-  { fill: '#453f22', edge: '#cdbb4a', dash: [4, 2, 1, 2] },
-  { fill: '#352a4d', edge: '#9a7ee0', dash: [1, 3] },
-  { fill: '#4d2a2a', edge: '#e07e7e', dash: [6, 2, 2, 2, 2, 2] },
+  { fill: '#E4EEFB', edge: '#4A7FDB', dash: [] },                 // A — solid
+  { fill: '#FBE7E7', edge: '#D95B5B', dash: [10, 6] },            // B — dashed
+  { fill: '#E6F5EA', edge: '#45A866', dash: [0.5, 8], dot: true },// C — dotted
+  { fill: '#FBF2DC', edge: '#D9A52E', dash: [], double: true },   // D — double
+  { fill: '#F0EAFB', edge: '#8B5CF6', dash: [12, 4, 2, 4] },      // E — dash-dot
+  { fill: '#DFF3F5', edge: '#2AA5B3', dash: [18, 7] },            // F — long-dash
 ];
 const COL = {
-  bg: '#10151f',
-  gridGap: '#10151f',
-  mark: '#8fa8e0',
-  autoX: 'rgba(255,255,255,0.20)',
-  officer: '#e8b23a',
-  officerRing: '#7c5a16',
-  officerStar: '#10151f',
-  heart: '#e05a6b',
-  heartDim: '#4a2b31',
-  text: '#cdd6ea',
-  textDim: '#6d7791',
+  bg: '#EEF1F6',
+  gridGap: '#EEF1F6',
+  mark: '#5A6472',     // player ✕: 2.5–3px, 56% cell
+  autoX: '#9AA4B0',    // system ✕: 2px, 44% — visibly quieter
+  officer: '#2B3A55',  // disc + white star, 60% cell
+  officerStar: '#FFFFFF',
+  heart: '#E8443A',
+  heartLost: '#D8DDE3', // outline only
+  text: '#2B3A55',
+  textDim: '#7A8496',
   rim: '#ff4d4d',
-  thief: '#1c1f2a',
+  thief: '#3A3F4A',
   thiefMask: '#e8e8e8',
-  caught: '#ffd75e',
+  thiefRing: '#F2B33C', // 3px spotlight ring
+  caught: '#B8860B',
 };
 
 export function createRenderer(canvas, board, session, layout, zones) {
   const ctx = canvas.getContext('2d');
   // Precompute region perimeter edge segments at load (allowed allocation):
   // for every cell, edges facing a different region or the board boundary.
+  // Contract: 3px stroke inset 1.5px INSIDE the owning cell → each segment
+  // carries an inward unit normal (nx, ny) so shared edges become two
+  // parallel strokes 3px apart, and the "double" pattern can offset its
+  // second line further inward.
   const n = board.n;
-  const segs = []; // load-time only
+  const INSET = 1.5;
+  const segs = []; // load-time only: reg, x1, y1, x2, y2, nx, ny
   for (let r = 0; r < n; r++) {
     for (let c = 0; c < n; c++) {
       const i = r * n + c;
       const reg = board.regions[i];
       const x = layout.cell[i * RECT_SLOTS], y = layout.cell[i * RECT_SLOTS + 1];
       const s = layout.cell[i * RECT_SLOTS + 2];
-      if (r === 0 || board.regions[i - n] !== reg) segs.push(reg, x, y, x + s, y);
-      if (r === n - 1 || board.regions[i + n] !== reg) segs.push(reg, x, y + s, x + s, y + s);
-      if (c === 0 || board.regions[i - 1] !== reg) segs.push(reg, x, y, x, y + s);
-      if (c === n - 1 || board.regions[i + 1] !== reg) segs.push(reg, x + s, y, x + s, y + s);
+      if (r === 0 || board.regions[i - n] !== reg) segs.push(reg, x, y + INSET, x + s, y + INSET, 0, 1);
+      if (r === n - 1 || board.regions[i + n] !== reg) segs.push(reg, x, y + s - INSET, x + s, y + s - INSET, 0, -1);
+      if (c === 0 || board.regions[i - 1] !== reg) segs.push(reg, x + INSET, y, x + INSET, y + s, 1, 0);
+      if (c === n - 1 || board.regions[i + 1] !== reg) segs.push(reg, x + s - INSET, y, x + s - INSET, y + s, -1, 0);
     }
   }
   return {
@@ -122,18 +126,18 @@ export function draw(R, fx, ui, muted) {
 
     if (st === MARK) {
       ctx.strokeStyle = COL.mark;
-      ctx.lineWidth = Math.max(2, s * 0.08);
+      ctx.lineWidth = Math.min(3, Math.max(2.5, s * 0.035));
       ctx.lineCap = 'round';
-      const a = s * 0.22;
+      const a = s * 0.28; // 56% cell
       ctx.beginPath();
       ctx.moveTo(-a, -a); ctx.lineTo(a, a);
       ctx.moveTo(a, -a); ctx.lineTo(-a, a);
       ctx.stroke();
     } else if (st === AUTO_X) {
       ctx.strokeStyle = COL.autoX;
-      ctx.lineWidth = Math.max(1.5, s * 0.05);
+      ctx.lineWidth = 2;
       ctx.lineCap = 'round';
-      const a = s * 0.16;
+      const a = s * 0.22; // 44% cell — visibly quieter
       ctx.beginPath();
       ctx.moveTo(-a, -a); ctx.lineTo(a, a);
       ctx.moveTo(a, -a); ctx.lineTo(-a, a);
@@ -149,15 +153,11 @@ export function draw(R, fx, ui, muted) {
         dy = (ty - cy) * converge;
       }
       ctx.translate(dx, dy);
-      const rad = s * 0.30;
+      const rad = s * 0.30; // 60% cell
       ctx.fillStyle = COL.officer;
       ctx.beginPath(); ctx.arc(0, 0, rad, 0, Math.PI * 2); ctx.fill();
-      ctx.strokeStyle = COL.officerRing;
-      ctx.lineWidth = Math.max(2, s * 0.05);
-      ctx.stroke();
-      // badge star
       ctx.fillStyle = COL.officerStar;
-      starPath(ctx, 0, 0, rad * 0.55, rad * 0.24, 5);
+      starPath(ctx, 0, 0, rad * 0.58, rad * 0.25, 5);
       ctx.fill();
     }
     ctx.restore();
@@ -174,19 +174,29 @@ export function draw(R, fx, ui, muted) {
     }
   }
 
-  // ---- region perimeters (patterned, never hue alone)
+  // ---- region perimeters (CANVAS R1: 3px, inset 1.5px, pattern per region)
   const E = R.edges;
-  for (let k = 0; k < E.length; k += 5) {
+  for (let k = 0; k < E.length; k += 7) {
     const style = REGION_STYLE[E[k] % REGION_STYLE.length];
     ctx.strokeStyle = style.edge;
-    ctx.lineWidth = 2.5;
+    ctx.lineWidth = 3;
+    ctx.lineCap = style.dot ? 'round' : 'butt';
     ctx.setLineDash(style.dash);
     ctx.beginPath();
     ctx.moveTo(E[k + 1], E[k + 2]);
     ctx.lineTo(E[k + 3], E[k + 4]);
     ctx.stroke();
+    if (style.double) {
+      // second thin line 3px further inward — the "double" pattern
+      ctx.lineWidth = 1.5;
+      ctx.beginPath();
+      ctx.moveTo(E[k + 1] + E[k + 5] * 3.5, E[k + 2] + E[k + 6] * 3.5);
+      ctx.lineTo(E[k + 3] + E[k + 5] * 3.5, E[k + 4] + E[k + 6] * 3.5);
+      ctx.stroke();
+    }
   }
   ctx.setLineDash([]);
+  ctx.lineCap = 'butt';
 
   // ---- board-solve bloom (row 6)
   if (bloom > 0.001) {
@@ -227,6 +237,12 @@ export function draw(R, fx, ui, muted) {
       ctx.arc(tr * 0.35, -tr * 0.1, tr * 0.1, 0, Math.PI * 2);
       ctx.fill();
       ctx.restore();
+      // thief ring: 3px #F2B33C spotlight converged on cell (CANVAS R1)
+      ctx.strokeStyle = COL.thiefRing;
+      ctx.lineWidth = 3;
+      ctx.globalAlpha = snap;
+      ctx.strokeRect(layout.cell[ti * RECT_SLOTS] + 1.5, layout.cell[ti * RECT_SLOTS + 1] + 1.5, s - 3, s - 3);
+      ctx.globalAlpha = 1;
       if (snap > 0.4) {
         ctx.globalAlpha = (snap - 0.4) * 0.8;
         ctx.fillStyle = '#ffffff';
@@ -272,10 +288,18 @@ function drawHud(R, fx, ui, muted) {
     ctx.save();
     ctx.translate(hx, hy + dy);
     ctx.scale(0.9, 0.9);
-    ctx.fillStyle = alive ? COL.heart : COL.heartDim;
-    ctx.globalAlpha = alive ? 1 : 1 - dim * 0.4;
-    heartPath(ctx, 0, 0, 11);
-    ctx.fill();
+    if (alive) {
+      ctx.fillStyle = COL.heart;
+      heartPath(ctx, 0, 0, 11);
+      ctx.fill();
+    } else {
+      // lost heart: outline only (CANVAS R1: #D8DDE3)
+      ctx.globalAlpha = 1 - dim * 0.4;
+      ctx.strokeStyle = COL.heartLost;
+      ctx.lineWidth = 2;
+      heartPath(ctx, 0, 0, 11);
+      ctx.stroke();
+    }
     ctx.restore();
     ctx.globalAlpha = 1;
   }
@@ -289,7 +313,7 @@ function drawHud(R, fx, ui, muted) {
   // mute toggle (P9: audio is never untoggleable) — drawn speaker, no emoji
   // font dependency (headless/older devices render tofu otherwise)
   const mz = zones.mute;
-  ctx.fillStyle = 'rgba(255,255,255,0.08)';
+  ctx.fillStyle = 'rgba(43,58,85,0.10)';
   roundRect(ctx, mz.x, mz.y, mz.w, mz.h, 8);
   ctx.fill();
   const mx = mz.x + mz.w / 2, my = mz.y + mz.h / 2;
