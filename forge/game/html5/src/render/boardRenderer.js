@@ -62,6 +62,7 @@ export function createRenderer(canvas, board, session, layout, zones) {
   return {
     ctx, board, session, layout, zones,
     edges: Float32Array.from(segs),
+    label: `${board.id} · ${board.tier} · teaches: ${board.teaches}`, // cached at load: no per-frame string allocs
     dirty: true,
   };
 }
@@ -99,8 +100,10 @@ export function draw(R, fx, ui, muted) {
     ctx.fillStyle = style.fill;
     ctx.fillRect(x, y, s, s);
     if (bright > 1.001) {
-      ctx.fillStyle = `rgba(255,255,255,${Math.min(0.35, (bright - 1) * 2)})`;
+      ctx.globalAlpha = Math.min(0.35, (bright - 1) * 2);
+      ctx.fillStyle = '#ffffff';
       ctx.fillRect(x, y, s, s);
+      ctx.globalAlpha = 1;
     }
 
     const st = session.cellState[i];
@@ -188,8 +191,10 @@ export function draw(R, fx, ui, muted) {
   // ---- board-solve bloom (row 6)
   if (bloom > 0.001) {
     const pulse = bloom < 0.5 ? 2 * bloom : 2 * (1 - bloom);
-    ctx.fillStyle = `rgba(255,255,255,${0.20 * pulse * (fx.feel.boardSolveBloom.brightnessPeak - 1) * 5})`;
+    ctx.globalAlpha = 0.20 * pulse * (fx.feel.boardSolveBloom.brightnessPeak - 1) * 5;
+    ctx.fillStyle = '#ffffff';
     ctx.fillRect(layout.boardX, layout.boardY, layout.boardSize, layout.boardSize);
+    ctx.globalAlpha = 1;
   }
 
   // ---- thief catch overlay (row 7): spotlight hole over thiefCell
@@ -199,11 +204,13 @@ export function draw(R, fx, ui, muted) {
     const tx = layout.cell[ti * RECT_SLOTS] + s / 2;
     const ty = layout.cell[ti * RECT_SLOTS + 1] + s / 2;
     if (spot < 1) {
-      ctx.fillStyle = `rgba(8,10,16,${0.62 * spot})`;
+      ctx.globalAlpha = 0.62 * spot;
+      ctx.fillStyle = '#080a10';
       ctx.beginPath();
       ctx.rect(layout.boardX, layout.boardY, layout.boardSize, layout.boardSize);
       ctx.arc(tx, ty, s * (0.4 + 0.8 * spot), 0, Math.PI * 2, true);
       ctx.fill('evenodd');
+      ctx.globalAlpha = 1;
     }
     if (snap > 0) {
       // thief glyph revealed at the snap
@@ -221,16 +228,20 @@ export function draw(R, fx, ui, muted) {
       ctx.fill();
       ctx.restore();
       if (snap > 0.4) {
-        ctx.fillStyle = `rgba(255,255,255,${(snap - 0.4) * 0.8})`;
+        ctx.globalAlpha = (snap - 0.4) * 0.8;
+        ctx.fillStyle = '#ffffff';
         ctx.fillRect(layout.boardX, layout.boardY, layout.boardSize, layout.boardSize);
+        ctx.globalAlpha = 1;
       }
     }
   }
 
   // ---- fail desaturate + settle (§4.5: dignity, not punishment)
   if (ui.phase === 'failed') {
-    ctx.fillStyle = `rgba(16,21,31,${0.55 * failFade})`;
+    ctx.globalAlpha = 0.55 * failFade;
+    ctx.fillStyle = COL.bg;
     ctx.fillRect(0, 0, W, H);
+    ctx.globalAlpha = 1;
   }
 
   drawHud(R, fx, ui, muted);
@@ -273,7 +284,7 @@ function drawHud(R, fx, ui, muted) {
   ctx.fillStyle = COL.textDim;
   ctx.font = '12px system-ui, sans-serif';
   ctx.textAlign = 'center';
-  ctx.fillText(`${board.id} · ${board.tier} · teaches: ${board.teaches}`, W / 2, 46);
+  ctx.fillText(R.label, W / 2, 46);
 
   // mute toggle (P9: audio is never untoggleable) — drawn speaker, no emoji
   // font dependency (headless/older devices render tofu otherwise)
