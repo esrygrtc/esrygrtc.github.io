@@ -342,20 +342,35 @@ function drawHud(R, fx, ui, muted) {
     ctx.fillStyle = COL.caught;
     ctx.font = 'bold 22px system-ui, sans-serif';
     ctx.fillText('THIEF CAUGHT!', W / 2, az.y - 18);
-    ctx.fillStyle = '#2f7d4f';
-    roundRect(ctx, az.x, az.y, az.w, az.h, 12);
-    ctx.fill();
-    ctx.fillStyle = '#eafff2';
+    // #141: painted primary green button (CANVAS source art)
+    if (R.images && R.images.primary) {
+      // Sprite content bbox: (126,127)→(865,432) in 992×576 canvas
+      ctx.drawImage(R.images.primary, 126, 127, 739, 305, az.x, az.y, az.w, az.h);
+    } else {
+      ctx.fillStyle = '#2f7d4f';
+      roundRect(ctx, az.x, az.y, az.w, az.h, 12);
+      ctx.fill();
+    }
+    ctx.fillStyle = '#ffffff';
     ctx.font = 'bold 17px system-ui, sans-serif';
+    ctx.shadowColor = 'rgba(0,0,0,0.4)';
+    ctx.shadowBlur = 2;
+    ctx.shadowOffsetY = 1;
     ctx.fillText(ui.hasNext ? 'NEXT BOARD' : 'REPLAY PACK', W / 2, az.y + az.h / 2 + 6);
+    ctx.shadowColor = 'transparent'; ctx.shadowBlur = 0; ctx.shadowOffsetY = 0;
   } else if (ui.phase === 'failed') {
     ctx.fillStyle = COL.text;
     ctx.font = 'bold 20px system-ui, sans-serif';
     ctx.fillText('OUT OF HEARTS', W / 2, az.y - 18);
-    ctx.fillStyle = '#7d4a2f';
-    roundRect(ctx, az.x, az.y, az.w, az.h, 12);
-    ctx.fill();
-    ctx.fillStyle = '#ffeee4';
+    // #141: painted secondary cream button (CANVAS source art)
+    if (R.images && R.images.secondary) {
+      ctx.drawImage(R.images.secondary, 116, 99, 749, 370, az.x, az.y, az.w, az.h);
+    } else {
+      ctx.fillStyle = '#7d4a2f';
+      roundRect(ctx, az.x, az.y, az.w, az.h, 12);
+      ctx.fill();
+    }
+    ctx.fillStyle = '#0C2F50';
     ctx.font = 'bold 17px system-ui, sans-serif';
     ctx.fillText('RETRY — SAME BOARD', W / 2, az.y + az.h / 2 + 6);
   } else {

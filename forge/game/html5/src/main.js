@@ -21,11 +21,30 @@ async function loadJson(url) {
   return res.json();
 }
 
+// #141: preload painted button sprites (CANVAS source art, shipped bytes).
+// Greybox loaded NO images before — these are the first shipped assets.
+async function preloadImages() {
+  const specs = [
+    ['primary', 'assets/ui/btn_primary_default.webp'],
+    ['primaryPressed', 'assets/ui/btn_primary_pressed.webp'],
+    ['secondary', 'assets/ui/btn_secondary_default.webp'],
+    ['secondaryPressed', 'assets/ui/btn_secondary_pressed.webp'],
+  ];
+  const imgs = {};
+  await Promise.all(specs.map(([key, src]) => {
+    const img = new Image();
+    img.src = src;
+    return img.decode().then(() => { imgs[key] = img; }).catch(() => {});
+  }));
+  return imgs;
+}
+
 async function boot() {
-  const [pack, feel, tuning] = await Promise.all([
+  const [pack, feel, tuning, images] = await Promise.all([
     loadJson('src/data/levels.p1.json'),
     loadJson('src/data/feel.json'),
     loadJson('src/data/tuning.json'),
+    preloadImages(),
   ]);
 
   const canvas = document.getElementById('game');
@@ -41,6 +60,7 @@ async function boot() {
     sfx: createSfx(),
     fx: createFx(feel),
     zones: hudZones(tuning),
+    images,
     levelIndex: 0,
     board: null, session: null, layout: null, renderer: null,
     ui: { phase: 'play', animating: false, hasNext: true, phaseT0: 0 },
@@ -126,6 +146,7 @@ function loadLevel(G, index) {
   G.session = createSession(G.board, G.tuning);
   G.layout = computeLayout(G.tuning, G.board.n);
   G.renderer = createRenderer(G.canvas, G.board, G.session, G.layout, G.zones);
+  G.renderer.images = G.images;
   fxLoadLevel(G.fx, G.board.n);
   G.ui.phase = 'play';
   G.ui.hasNext = index < G.pack.levels.length - 1;
