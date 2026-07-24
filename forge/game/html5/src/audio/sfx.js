@@ -2,11 +2,10 @@
 // Lazy-unlocked on first pointerdown (iOS autoplay policy). Mute toggle
 // persisted to localStorage (Meowdoku top-5 complaint, #130 §4).
 // P8: sound is information — every gameplay event gets a designed sound.
-// #141 R3/R4/R5: fixed load-bookkeeping order, probe exposes loaded/failed,
-// continuous sampling driven by timer (not poll). §7.2.7 can-fail wired.
-// R3 disclosure: 50ms poll with 512-sample analyser window → ~21–23%
-// duty cycle (fftSize / sampleRate) / intervalMs. Sounds shorter than
-// the window (~11–12 ms) falling entirely between polls are invisible.
+// #141 R3: gapless observer via ScriptProcessorNode — no dead time.
+// dutyCycle measured in _probe(), ~1.0 when observer is connected.
+// R4: probe exposes loaded/failed. R5: loaded.push after decode.
+// §7.2.7 can-fail wired (tools/sfx_probe_selftest.mjs).
 
 const SFX_KEYS = [
   'x_mark', 'place', 'cascade_tick', 'cascade_diag',
@@ -16,7 +15,6 @@ const SFX_KEYS = [
 ];
 
 const WINDOW_MS = 250;
-const SAMPLE_INTERVAL_MS = 50; // poll rate; actual duty cycle ~21–23% (see header)
 
 export function createSfx() {
   const muted = localStorage.getItem('copdoku_muted') === '1';
@@ -24,18 +22,46 @@ export function createSfx() {
     ctx: null, master: null, muted, unlocked: false, buffers: {}, gain: 0.9,
     loaded: [], failed: [],
     _lastEventTag: '', _eventCount: 0,
-    _peakRms: 0, _peakSinceLastPoll: 0, _rmsWindow: [], _sampleTimer: null,
+    _peakRms: 0, _peakSinceLastPoll: 0, _rmsWindow: [],
+    _obsNode: null, _framesObserved: 0,
   };
   return sfx;
 }
 
 function _startSampling(sfx) {
-  if (sfx._sampleTimer) return;
-  sfx._sampleTimer = setInterval(() => {
-    const rms = _readRms(sfx);
+  if (sfx._obsNode) return;
+  // Gapless observer on master, parallel to analyser.
+  // ScriptProcessorNode(256, 1, 1) fires every ~5.3 ms at 48 kHz.
+  // Must route through a zero-gain sink to ctx.destination;
+  // a ScriptProcessor that reaches no destination never fires.
+  const obs = sfx.ctx.createScriptProcessor(256, 1, 1);
+  sfx.master.connect(obs);
+  const sink = sfx.ctx.createGain();
+  sink.gain.value = 0;
+  obs.connect(sink);
+  sink.connect(sfx.ctx.destination);
+
+  sfx._obsNode = obs;
+  sfx._framesObserved = 0;
+
+  obs.onaudioprocess = (ev) => {
+    const data = ev.inputBuffer.getChannelData(0);
+    const len = data.length;
+    sfx._framesObserved += len;
+
+    // Per-block peak-abs and RMS
+    let sumSq = 0;
+    let peakAbs = 0;
+    for (let i = 0; i < len; i++) {
+      const v = data[i];
+      sumSq += v * v;
+      const abs = Math.abs(v);
+      if (abs > peakAbs) peakAbs = abs;
+    }
+    const rms = Math.sqrt(sumSq / len);
     const now = performance.now();
 
-    // Rolling 250ms window for peakRms (same semantic as before)
+    // Rolling 250 ms window for peakRms (same semantic as before)
     sfx._rmsWindow.push({ t: now, rms });
     const cutoff = now - WINDOW_MS;
     while (sfx._rmsWindow.length && sfx._rmsWindow[0].t < cutoff) sfx._rmsWindow.shift();
@@ -43,9 +69,9 @@ function _startSampling(sfx) {
     for (const s of sfx._rmsWindow) if (s.rms > peak) peak = s.rms;
     sfx._peakRms = peak;
 
-    // Peak since last probe read — reset by _probe() on each call
-    if (rms > sfx._peakSinceLastPoll) sfx._peakSinceLastPoll = rms;
-  }, SAMPLE_INTERVAL_MS);
+    // Peak-abs since last probe read — catches transients RMS smooths out
+    if (peakAbs > sfx._peakSinceLastPoll) sfx._peakSinceLastPoll = peakAbs;
+  };
 }
 
 /** Decode all 14 mp3s once, attach analyser chain, expose callable probe. */
@@ -101,27 +127,26 @@ export function sfxUnlock(sfx) {
   return _unlockPromise;
 }
 
-function _readRms(sfx) {
-  if (!sfx.analyser) return 0;
-  const data = new Float32Array(sfx.analyser.fftSize);
-  sfx.analyser.getFloatTimeDomainData(data);
-  let sum = 0;
-  for (let i = 0; i < data.length; i++) sum += data[i] * data[i];
-  return Math.sqrt(sum / data.length);
-}
-
 function _probe(sfx) {
-  // R3: peakSinceLastPoll captures max over continuous samples since last read,
-  // then resets. Sampling runs on a timer (50ms), not poll-driven.
+  // R3: peakSinceLastPoll captures max peak-abs over every audio block
+  // since last read, then resets. Driven by gapless ScriptProcessorNode.
   const peakSinceLastPoll = sfx._peakSinceLastPoll || 0;
   sfx._peakSinceLastPoll = 0;
+
+  const sampleRate = sfx.ctx ? sfx.ctx.sampleRate : 0;
+  const framesObserved = sfx._framesObserved || 0;
+  const framesElapsed = sfx.ctx ? Math.round(sfx.ctx.currentTime * sampleRate) : 0;
+  const dutyCycle = framesElapsed > 0 ? framesObserved / framesElapsed : 0;
 
   // R4: loaded/failed now readable from the page
   return {
     ctxState: sfx.ctx ? sfx.ctx.state : 'closed',
-    sampleRate: sfx.ctx ? sfx.ctx.sampleRate : 0,
+    sampleRate,
     peakRms: sfx._peakRms || 0,
     peakSinceLastPoll,
+    framesObserved,
+    framesElapsed,
+    dutyCycle,
     loaded: [...sfx.loaded],
     failed: [...sfx.failed],
     lastEventTag: sfx._lastEventTag,
