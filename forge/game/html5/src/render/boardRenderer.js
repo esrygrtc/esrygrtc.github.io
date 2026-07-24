@@ -342,10 +342,9 @@ function drawHud(R, fx, ui, muted) {
     ctx.fillStyle = COL.caught;
     ctx.font = 'bold 22px system-ui, sans-serif';
     ctx.fillText('THIEF CAUGHT!', W / 2, az.y - 18);
-    // #141: painted primary green button (CANVAS source art)
+    // #141: painted primary green button (B-Fluid production art @ e01c79ec)
     if (R.images && R.images.primary) {
-      // Sprite content bbox: (126,127)→(865,432) in 992×576 canvas
-      ctx.drawImage(R.images.primary, 126, 127, 739, 305, az.x, az.y, az.w, az.h);
+      ctx.drawImage(R.images.primary, 0, 0, R.images.primary.naturalWidth, R.images.primary.naturalHeight, az.x, az.y, az.w, az.h);
     } else {
       ctx.fillStyle = '#2f7d4f';
       roundRect(ctx, az.x, az.y, az.w, az.h, 12);
@@ -362,9 +361,9 @@ function drawHud(R, fx, ui, muted) {
     ctx.fillStyle = COL.text;
     ctx.font = 'bold 20px system-ui, sans-serif';
     ctx.fillText('OUT OF HEARTS', W / 2, az.y - 18);
-    // #141: painted secondary cream button (CANVAS source art)
+    // #141: painted secondary cream button (B-Fluid production art @ e01c79ec)
     if (R.images && R.images.secondary) {
-      ctx.drawImage(R.images.secondary, 116, 99, 749, 370, az.x, az.y, az.w, az.h);
+      ctx.drawImage(R.images.secondary, 0, 0, R.images.secondary.naturalWidth, R.images.secondary.naturalHeight, az.x, az.y, az.w, az.h);
     } else {
       ctx.fillStyle = '#7d4a2f';
       roundRect(ctx, az.x, az.y, az.w, az.h, 12);
