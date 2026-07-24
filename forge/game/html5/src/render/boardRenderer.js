@@ -343,35 +343,33 @@ function drawHud(R, fx, ui, muted) {
     ctx.font = 'bold 22px system-ui, sans-serif';
     ctx.fillText('THIEF CAUGHT!', W / 2, az.y - 18);
     // #141: painted primary green button (B-Fluid production art @ e01c79ec)
+    // B-Fluid sprites have baked-in text — skip fillText when image loads
     if (R.images && R.images.primary) {
       ctx.drawImage(R.images.primary, 0, 0, R.images.primary.naturalWidth, R.images.primary.naturalHeight, az.x, az.y, az.w, az.h);
     } else {
       ctx.fillStyle = '#2f7d4f';
       roundRect(ctx, az.x, az.y, az.w, az.h, 12);
       ctx.fill();
+      ctx.fillStyle = '#ffffff';
+      ctx.font = 'bold 17px system-ui, sans-serif';
+      ctx.fillText(ui.hasNext ? 'NEXT BOARD' : 'REPLAY PACK', W / 2, az.y + az.h / 2 + 6);
     }
-    ctx.fillStyle = '#ffffff';
-    ctx.font = 'bold 17px system-ui, sans-serif';
-    ctx.shadowColor = 'rgba(0,0,0,0.4)';
-    ctx.shadowBlur = 2;
-    ctx.shadowOffsetY = 1;
-    ctx.fillText(ui.hasNext ? 'NEXT BOARD' : 'REPLAY PACK', W / 2, az.y + az.h / 2 + 6);
-    ctx.shadowColor = 'transparent'; ctx.shadowBlur = 0; ctx.shadowOffsetY = 0;
   } else if (ui.phase === 'failed') {
     ctx.fillStyle = COL.text;
     ctx.font = 'bold 20px system-ui, sans-serif';
     ctx.fillText('OUT OF HEARTS', W / 2, az.y - 18);
     // #141: painted secondary cream button (B-Fluid production art @ e01c79ec)
+    // B-Fluid sprites have baked-in text — skip fillText when image loads
     if (R.images && R.images.secondary) {
       ctx.drawImage(R.images.secondary, 0, 0, R.images.secondary.naturalWidth, R.images.secondary.naturalHeight, az.x, az.y, az.w, az.h);
     } else {
       ctx.fillStyle = '#7d4a2f';
       roundRect(ctx, az.x, az.y, az.w, az.h, 12);
       ctx.fill();
+      ctx.fillStyle = '#0C2F50';
+      ctx.font = 'bold 17px system-ui, sans-serif';
+      ctx.fillText('RETRY — SAME BOARD', W / 2, az.y + az.h / 2 + 6);
     }
-    ctx.fillStyle = '#0C2F50';
-    ctx.font = 'bold 17px system-ui, sans-serif';
-    ctx.fillText('RETRY — SAME BOARD', W / 2, az.y + az.h / 2 + 6);
   } else {
     ctx.fillStyle = COL.textDim;
     ctx.font = '13px system-ui, sans-serif';
