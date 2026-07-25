@@ -70,18 +70,21 @@
     "tier": 2
   },
   "uiTransition": { "defaultMs": 200, "tier": 1 },
-  "stageMorph": {
-    "morphVisualMs": 300,
-    "crossfadeMs": 200,
-    "markerFadeMs": 100,
-    "markerFadeStartAtMs": 150,
-    "sweepPerCellMs": 80,
+  "paletteFlip": {
+    "flipTotalMaxMs": 300,
+    "cellCrossfadeMs": 100,
+    "cellFlipWindowMs": 200,
+    "ringStaggerMs": 12,
+    "headerChipMs": 150,
+    "headerChipStartAtMs": 50,
+    "ambientWashMs": 250,
+    "ambientWashStartAtMs": 0,
     "inputLockMaxMs": 200,
     "ackBudgetMs": 50,
-    "easeCells": "ease-in-out cubic",
-    "easeReveal": "ease-out cubic",
+    "easeCells": "ease-out cubic",
+    "easeChrome": "ease-in cubic",
     "tier": 2,
-    "note": "PULSE v5 row 12 — board re-partition transition; X sweep is OVERRIDE of row 4, not reuse"
+    "note": "PULSE v6 row 12 — DAY→NIGHT palette flip; same shapes, colors swap; X marks persist (AC3); no morph, no sweep"
   },
   "thiefCatchTap": {
     "concealFadeMs": 80,
@@ -92,15 +95,15 @@
     "easeSnap": "ease-out cubic",
     "easeSettle": "ease-in cubic",
     "tier": 2,
-    "note": "PULSE v5 row 13 — cuff-snap micro-sting, distinct from row 3 officer-place"
+    "note": "PULSE v6 row 13 — cuff-snap micro-sting, distinct from row 3 officer-place"
   },
   "stage2Clear": {
     "totalMs": 280,
     "brightnessPeak": 1.18,
     "tier": 3,
-    "note": "PULSE v5 row 14 — full-board bloom + brass resolve, scaled-down from row 7"
+    "note": "PULSE v6 row 14 — THIEF-CAUGHT capstone; full-board bloom + brass resolve, scaled-down from row 7"
   },
-  "wrongHideout": {
+  "wrongCellTap": {
     "rimFlashMs": 80,
     "shakeMs": 60,
     "shakeAmplitudePx": 2,
@@ -110,6 +113,6 @@
     "totalMaxMs": 250,
     "rimColor": "amber",
     "tier": 2,
-    "note": "PULSE v5 row 15 — gentler than row 8; amber not red, ±2px not ±3"
+    "note": "PULSE v6 row 15 — gentler than row 8; amber not red, ±2px not ±3"
   }
 }
