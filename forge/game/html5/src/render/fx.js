@@ -3,6 +3,10 @@
 // from the feel data passed in — no timing constant is hard-coded here.
 // Zero per-frame allocation: a fixed tween pool is recycled; per-frame work is
 // indexed loops over typed arrays only.
+//
+// #143 Option II — stage-2 fx: fxFlip (palette flip row 12), fxThiefFound
+// (cuff-snap row 13), fxStage2Clear (capstone row 14), fxWrongCell (amber
+// gentle row 15). Single-thief fxThiefCatchStart/Skip RETIRED.
 
 // ---------------------------------------------------------------- easing
 // cubic-bezier solver (standard); easings built once at load from feel.json.
@@ -41,17 +45,20 @@ export const TW_SHAKE = 5;      // heart-loss shake ±3px (row 8 ONLY — blocke
 export const TW_RIM = 6;        // heart-loss red rim flash (row 8)
 export const TW_BLOCKED = 7;    // blocked-tap neutral scale pulse (PULSE v4 row 10)
 export const TW_UNMARK = 8;     // toggle-commit mark-off reversed 90ms (AMENDMENT 6)
+// #143 stage-2 tween kinds
+export const TW_THIEF_FOUND = 9;  // cuff-snap micro-sting (row 13)
+export const TW_WRONG_CELL = 10;  // amber rim + gentle shake (row 15)
+export const TW_FLIP_CELL = 11;   // palette flip cell crossfade (row 12)
 
 // board-level fx ids (not per-cell)
 export const BF_BLOOM = 0;      // board-solve bloom (row 6)
 export const BF_FAIL_FADE = 1;  // fail desaturate+settle (§4.5)
-export const BF_SPOT = 2;       // thief spotlight progress (row 7)
-export const BF_CONVERGE = 3;   // officers converge progress (row 7)
-export const BF_SNAP = 4;       // cuff snap flash (row 7)
+export const BF_FLIP = 2;       // palette flip progress (row 12)
+export const BF_STAGE2_CLEAR = 3; // stage-2 capstone bloom (row 14)
 export const BF_HEART = 5;      // heart dim/drop (row 8) — slot per heart
 
-const MAX_TW = 192;             // ≥ cells + headroom; recycled
-const BOARD_FX = 6;
+const MAX_TW = 256;             // ≥ cells + headroom; recycled
+const BOARD_FX = 8;
 
 // per-cell output slots
 export const FX_SCALE = 0;
@@ -198,31 +205,58 @@ export function fxFailFade(fx) {
   fx.boardFx[b + 1] = fx.now;
   fx.boardFx[b + 2] = fx.feel.failState.desaturateMs;
 }
-// Thief catch timeline (row 7): spotlight → converge → snap → settle.
-// Skippable after skippableAfterMs; skip commits final state instantly.
-export function fxThiefCatchStart(fx) {
-  const f = fx.feel.thiefCatch;
-  setBoardFx(fx, BF_SPOT, f.spotlightMs, 0);
-  setBoardFx(fx, BF_CONVERGE, f.convergeMs, f.spotlightMs);
-  setBoardFx(fx, BF_SNAP, f.cuffSnapMs, f.spotlightMs + f.convergeMs);
-}
-export function fxThiefCatchSkip(fx) {
-  setBoardFxDone(fx, BF_SPOT);
-  setBoardFxDone(fx, BF_CONVERGE);
-  setBoardFxDone(fx, BF_SNAP);
-}
-function setBoardFx(fx, slot, dur, delay) {
-  const b = slot * 4;
+
+// ════════════════════════════════════════════════════════════════════
+// #143 Option II — stage-2 fx triggers (PULSE v6 rows 12-15)
+// ════════════════════════════════════════════════════════════════════
+
+// Row 12 — DAY→NIGHT palette flip. Board-level progress 0→1 over flipTotalMaxMs.
+// Per-cell crossfade tweens fire with ring stagger for visual richness.
+export function fxFlip(fx, n) {
+  const f = fx.feel.paletteFlip;
+  const b = BF_FLIP * 4;
   fx.boardFx[b] = 0;
-  fx.boardFx[b + 1] = fx.now + delay;
-  fx.boardFx[b + 2] = dur;
+  fx.boardFx[b + 1] = fx.now;
+  fx.boardFx[b + 2] = f.flipTotalMaxMs;
+  // stagger cell crossfade tweens ring-by-ring from center
+  const center = Math.floor(n / 2);
+  for (let r = 0; r < n; r++) {
+    for (let c = 0; c < n; c++) {
+      const idx = r * n + c;
+      const dist = Math.max(Math.abs(r - center), Math.abs(c - center));
+      const delay = dist * f.ringStaggerMs;
+      allocTween(fx, TW_FLIP_CELL, idx, fx.now, f.cellCrossfadeMs, delay);
+    }
+  }
 }
-function setBoardFxDone(fx, slot) {
-  const b = slot * 4;
-  fx.boardFx[b] = 1;
-  fx.boardFx[b + 1] = 0;
-  fx.boardFx[b + 2] = 1;
+
+// Row 13 — thief caught: cuff-snap micro-sting on the accused cell.
+export function fxThiefFound(fx, cellIdx) {
+  const f = fx.feel.thiefCatchTap;
+  allocTween(fx, TW_THIEF_FOUND, cellIdx, fx.now, f.totalMs, 0, f.snapPeakScale * 100);
 }
+
+// Row 14 — stage-2 capstone: full-board bloom + brass resolve.
+export function fxStage2Clear(fx) {
+  const b = BF_STAGE2_CLEAR * 4;
+  fx.boardFx[b] = 0;
+  fx.boardFx[b + 1] = fx.now;
+  fx.boardFx[b + 2] = fx.feel.stage2Clear.totalMs;
+}
+
+// Row 15 — wrong accusation: amber rim + gentle ±2px shake.
+export function fxWrongCell(fx, cellIdx) {
+  const f = fx.feel.wrongCellTap;
+  allocTween(fx, TW_WRONG_CELL, cellIdx, fx.now, f.rimFlashMs, 0, 1); // rim aux=1 (amber)
+  allocTween(fx, TW_SHAKE, cellIdx, fx.now, f.shakeMs, 0, f.shakeAmplitudePx * 100 + f.shakeCycles);
+  // heart dim/drop if heart was lost
+  const b = BF_HEART * 4;
+  fx.boardFx[b] = 0;
+  fx.boardFx[b + 1] = fx.now + f.heartDimDropDelayMs;
+  fx.boardFx[b + 2] = f.heartDimDropMs;
+}
+
+// ------------------------------------------------------------- board fx value
 export function boardFxValue(fx, slot) {
   const b = slot * 4;
   const dur = fx.boardFx[b + 2];
@@ -234,12 +268,6 @@ export function boardFxValue(fx, slot) {
   fx.boardFx[b] = v;
   return v;
 }
-export function thiefCatchSkippable(fx) {
-  return fx.now >= 0 && (fx.now - catchStart(fx)) >= fx.feel.thiefCatch.skippableAfterMs;
-}
-let _catchStart = 0;
-function catchStart() { return _catchStart; }
-export function noteCatchStart(fx) { _catchStart = fx.now; }
 
 // ------------------------------------------------------------- update
 // Called once per rAF with the tween clock (dt clamped to 32ms by main).
@@ -262,12 +290,13 @@ export function fxUpdate(fx, nowMs) {
 
     if (local >= dur) {
       // tween done: restore baseline values
-      if (kind === TW_ACK || kind === TW_PLACE || kind === TW_CASCADE || kind === TW_BLOCKED) cellFx[cb + FX_SCALE] = 1;
+      if (kind === TW_ACK || kind === TW_PLACE || kind === TW_CASCADE || kind === TW_BLOCKED || kind === TW_THIEF_FOUND) cellFx[cb + FX_SCALE] = 1;
       if (kind === TW_MARK || kind === TW_CASCADE) cellFx[cb + FX_GLYPH_OPACITY] = 1;
       if (kind === TW_UNMARK) { cellFx[cb + FX_GLYPH_OPACITY] = 0; cellFx[cb + FX_SCALE] = 1; }
       if (kind === TW_REGION) cellFx[cb + FX_BRIGHT] = 1;
       if (kind === TW_SHAKE) cellFx[cb + FX_SHAKEX] = 0;
-      if (kind === TW_RIM) cellFx[cb + FX_RIM] = 0;
+      if (kind === TW_RIM || kind === TW_WRONG_CELL) cellFx[cb + FX_RIM] = 0;
+      if (kind === TW_FLIP_CELL) { cellFx[cb + FX_SCALE] = 1; cellFx[cb + FX_GLYPH_OPACITY] = 1; }
       freeTween(fx, t);
       continue;
     }
@@ -322,6 +351,24 @@ export function fxUpdate(fx, nowMs) {
       cellFx[cb + FX_SHAKEX] = amp * Math.sin(p * cycles * 2 * Math.PI) * (1 - p);
     } else if (kind === TW_RIM) {
       cellFx[cb + FX_RIM] = 1 - fx.easeBoard(p);
+    } else if (kind === TW_THIEF_FOUND) {
+      // Row 13 — cuff-snap: scale peak 1.15 at snapFlashMs, settle by totalMs
+      const f = feel.thiefCatchTap;
+      const snapFrac = f.snapFlashMs / dur;
+      const peak = f.snapPeakScale;
+      if (p <= snapFrac) {
+        cellFx[cb + FX_SCALE] = 1 + (peak - 1) * fx.easeBoard(p / snapFrac);
+      } else {
+        cellFx[cb + FX_SCALE] = peak - (peak - 1) * fx.easeBoard((p - snapFrac) / (1 - snapFrac));
+      }
+    } else if (kind === TW_WRONG_CELL) {
+      // Row 15 — amber rim flash, decays
+      cellFx[cb + FX_RIM] = 1 - fx.easeBoard(p);
+    } else if (kind === TW_FLIP_CELL) {
+      // Row 12 — cell crossfade: brief scale dip + opacity flicker during flip
+      const e = fx.easeBoard(p);
+      cellFx[cb + FX_SCALE] = 1 - 0.05 * Math.sin(e * Math.PI);
+      cellFx[cb + FX_GLYPH_OPACITY] = 1;
     }
   }
 }

@@ -1,16 +1,19 @@
 // main.js — bootstrap: load data → Session → rAF loop (spec §2, §5).
 // Fixed tween clock in ms, dt clamped to 32ms so a background tab cannot
 // fling animations. Single rAF loop; draws only when something changed.
+//
+// #143 Option II — phase machine: play → bloom → flip → find → caught → won
+// Replaces single-thief catch cutscene with interactive two-act session.
 
 import { createBoard } from './core/board.js';
-import { createSession, retry } from './core/session.js';
+import { createSession, retry, enterStage2 } from './core/session.js';
 import { computeLayout, hudZones } from './render/layout.js';
 import { createRenderer, draw, markDirty } from './render/boardRenderer.js';
 import {
-  createFx, fxLoadLevel, fxUpdate, fxBloom, fxThiefCatchStart, fxThiefCatchSkip,
-  fxFailFade, noteCatchStart,
+  createFx, fxLoadLevel, fxUpdate, fxBloom, fxFailFade,
+  fxFlip, fxThiefFound, fxStage2Clear, fxWrongCell,
 } from './render/fx.js';
-import { createSfx, sfxToggleMute, sfxCatch } from './audio/sfx.js';
+import { createSfx, sfxToggleMute, sfxCatch, sfxMorph, sfxCatchCuff, sfxCatchResolve, sfxWrong } from './audio/sfx.js';
 import { attachTapRouter } from './input/tapRouter.js';
 
 const t0 = performance.now();
@@ -84,26 +87,47 @@ async function boot() {
       markDirty(G.renderer);
     }
   };
+
+  // #143: stage-1 solve → bloom (row 6) → flip (row 12) → find (act 2)
   G.onSolve = () => {
     fxBloom(G.fx);
     G.ui.phase = 'bloom';
     G.ui.phaseT0 = G.clock;
     G.ui.animating = true;
   };
-  G.onCatchStart = () => {
-    fxThiefCatchStart(G.fx);
-    noteCatchStart(G.fx);
-    sfxCatch(G.sfx);
-    G.ui.phase = 'catch';
+
+  // #143: bloom done → flip DAY→NIGHT
+  G.onFlip = () => {
+    fxFlip(G.fx, G.board.n);
+    sfxMorph(G.sfx);
+    G.ui.phase = 'flip';
     G.ui.phaseT0 = G.clock;
+    G.ui.animating = true;
   };
-  G.onCatchTap = () => {
-    if (G.clock - G.ui.phaseT0 >= G.feel.thiefCatch.skippableAfterMs) {
-      fxThiefCatchSkip(G.fx);
-      G.ui.phase = 'won';
-      markDirty(G.renderer);
-    }
+
+  // #143: flip done → enter stage 2 (FIND)
+  G.onEnterStage2 = () => {
+    enterStage2(G.session);
+    G.ui.phase = 'find';
+    G.ui.animating = false;
+    markDirty(G.renderer);
   };
+
+  // #143: all k thieves caught → capstone
+  G.onStage2Clear = () => {
+    fxStage2Clear(G.fx);
+    sfxCatchResolve(G.sfx);
+    G.ui.phase = 'caught';
+    G.ui.phaseT0 = G.clock;
+    G.ui.animating = true;
+  };
+
+  // #143: capstone done → won
+  G.onCaughtDone = () => {
+    G.ui.phase = 'won';
+    markDirty(G.renderer);
+  };
+
   G.onFail = () => {
     fxFailFade(G.fx);
     G.ui.phase = 'failed';
@@ -120,16 +144,17 @@ async function boot() {
     G.clock += dt;
     fxUpdate(G.fx, G.clock);
 
-    // phase machine: bloom → catch → won (rows 6→7 are one continuous beat)
+    // phase machine: bloom → flip → find → caught → won
     if (G.ui.phase === 'bloom' && G.clock - G.ui.phaseT0 >= G.feel.boardSolveBloom.totalMs) {
-      G.onCatchStart();
-    } else if (G.ui.phase === 'catch' && G.clock - G.ui.phaseT0 >= G.feel.thiefCatch.totalMs) {
-      G.ui.phase = 'won';
-      markDirty(G.renderer);
+      G.onFlip();
+    } else if (G.ui.phase === 'flip' && G.clock - G.ui.phaseT0 >= G.feel.paletteFlip.flipTotalMaxMs) {
+      G.onEnterStage2();
+    } else if (G.ui.phase === 'caught' && G.clock - G.ui.phaseT0 >= G.feel.stage2Clear.totalMs) {
+      G.onCaughtDone();
     } else if (G.ui.phase === 'failed' && G.fx.activeCount === 0) {
       G.ui.animating = false;
     }
-    if (G.ui.phase === 'won' || G.ui.phase === 'play') G.ui.animating = false;
+    if (G.ui.phase === 'won' || G.ui.phase === 'find' || G.ui.phase === 'play') G.ui.animating = false;
 
     draw(G.renderer, G.fx, G.ui, G.muted);
     requestAnimationFrame(loop);
@@ -151,6 +176,9 @@ function loadLevel(G, index) {
   G.ui.phase = 'play';
   G.ui.hasNext = index < G.pack.levels.length - 1;
   markDirty(G.renderer);
+
+  // #143: expose game object for CDP probe (greybox_probe.mjs G11/G12/G13)
+  if (typeof window !== 'undefined') window.__copdokuGame = G;
 }
 
 boot().catch((e) => {

@@ -2,6 +2,7 @@
 // Covers: auto-eliminate set correctness, toggle-mark grammar (single tap
 // EMPTY⇄MARK free both ways, double-tap commits, OFFICER terminal), heart
 // accounting, win/fail transitions, thief/region detection, retry.
+// #143: stage-2 FIND tests (G11/G12/G13), thiefCell refs updated to stage2.thieves.
 // Run: node --test
 
 import { test } from 'node:test';
@@ -10,9 +11,9 @@ import { readFileSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 import { dirname, join } from 'node:path';
 
-import { createBoard, EMPTY, MARK, OFFICER, AUTO_X } from '../src/core/board.js';
+import { createBoard, EMPTY, MARK, OFFICER, AUTO_X, THIEF } from '../src/core/board.js';
 import { isLegal, eliminationGroups, completedRegions } from '../src/core/rules.js';
-import { createSession, onTap, retry } from '../src/core/session.js';
+import { createSession, onTap, retry, enterStage2 } from '../src/core/session.js';
 
 const HERE = dirname(fileURLToPath(import.meta.url));
 const pack = JSON.parse(readFileSync(join(HERE, '../src/data/levels.p1.json'), 'utf8'));
@@ -180,18 +181,25 @@ test('fail: 3 wrongs → failed; taps ignored after; retry restores (spec §4.5)
   assert.equal(countState(s, EMPTY), b.n * b.n);
 });
 
-test('win: full correct solve → won; thief cell is a real non-officer cell', () => {
+test('win: full correct solve → solvedBoard flag (NOT won — stage 2 follows); thief cells are non-officer', () => {
   for (const b of [L4, L5, L6]) {
     const s = createSession(b, tuning);
     for (let r = 0; r < b.n; r++) {
       const c = b.solution[r];
       const p = onTap(s, r, c, 'double', tuning);
       assert.equal(p.type, 'place');
+      // last placement returns solvedBoard=true, NOT status='won'
+      if (r === b.n - 1) {
+        assert.equal(p.solvedBoard, true, `${b.id} last place should return solvedBoard`);
+        assert.equal(s.status, 'playing', `${b.id} status stays playing after stage-1 solve`);
+      }
     }
-    assert.equal(s.status, 'won', `${b.id} solved`);
     assert.equal(s.placedCount, b.n);
-    const ti = b.thiefCell.r * b.n + b.thiefCell.c;
-    assert.notEqual(s.cellState[ti], OFFICER, 'thief cell is not an officer');
+    // thief cells are among the swept AUTO_X cells (not officers)
+    for (const thiefIdx of b.stage2.thieves) {
+      assert.notEqual(s.cellState[thiefIdx], OFFICER, 'thief cell is not an officer');
+      assert.equal(s.cellState[thiefIdx], AUTO_X, 'thief cell is AUTO_X after stage-1 solve');
+    }
     // after solve every non-officer cell is eliminated
     for (let i = 0; i < b.n * b.n; i++) {
       if (s.cellState[i] !== OFFICER) assert.equal(s.cellState[i], AUTO_X, `${b.id} cell ${i} resolved`);
@@ -211,8 +219,202 @@ test('region completion announced exactly once per region (spec §4.6/PULSE row 
       announced.add(g);
     }
   }
-  assert.equal(s.status, 'won');
   assert.equal(announced.size, b.n, 'all regions completed by full solve');
+});
+
+// ════════════════════════════════════════════════════════════════════
+// #143 Option II — stage-2 FIND tests (G11/G12/G13)
+// ════════════════════════════════════════════════════════════════════
+
+test('G11 — X persist: cellState identical pre- vs post-flip (enterStage2 mutates NO cell state)', () => {
+  for (const b of [L4, L5, L6]) {
+    const s = createSession(b, tuning);
+    // solve stage 1
+    for (let r = 0; r < b.n; r++) {
+      onTap(s, r, b.solution[r], 'double', tuning);
+    }
+    // snapshot cellState before enterStage2
+    const before = Array.from(s.cellState);
+    enterStage2(s);
+    // snapshot after
+    const after = Array.from(s.cellState);
+    // G11: identical — flip mutates palette only, never cellState
+    assert.deepEqual(after, before, `${b.id} cellState changed across flip`);
+    assert.equal(s.stage, 2, `${b.id} stage is 2 after enterStage2`);
+  }
+});
+
+test('G12 — verb intact both acts: single=mark, double=commit in stage 2; catching all k → won', () => {
+  for (const b of [L4, L5, L6]) {
+    const s = createSession(b, tuning);
+    // solve stage 1
+    for (let r = 0; r < b.n; r++) {
+      onTap(s, r, b.solution[r], 'double', tuning);
+    }
+    enterStage2(s);
+    assert.equal(s.stage, 2);
+    assert.equal(s.thievesFound, 0);
+
+    // stage 2: single tap on AUTO_X → MARK (suspect pencil)
+    const firstThiefIdx = b.stage2.thieves[0];
+    const firstThiefR = Math.floor(firstThiefIdx / b.n);
+    const firstThiefC = firstThiefIdx % b.n;
+
+    // single tap → mark (free, no heart cost)
+    const markEv = onTap(s, firstThiefR, firstThiefC, 'single', tuning);
+    assert.equal(markEv.type, 'mark', `${b.id} stage-2 single tap should mark`);
+    assert.equal(s.hearts, tuning.hearts, `${b.id} stage-2 mark is free`);
+
+    // single tap on MARK → erase (free)
+    const eraseEv = onTap(s, firstThiefR, firstThiefC, 'single', tuning);
+    assert.equal(eraseEv.type, 'erase', `${b.id} stage-2 erase is free`);
+
+    // double tap on thief cell → thiefFound
+    const foundEv = onTap(s, firstThiefR, firstThiefC, 'double', tuning);
+    assert.equal(foundEv.type, 'thiefFound', `${b.id} stage-2 double on thief = thiefFound`);
+    assert.equal(s.cellState[firstThiefIdx], THIEF, `${b.id} thief cell is THIEF after catch`);
+    assert.equal(s.thievesFound, 1);
+
+    // catch remaining thieves
+    for (let i = 1; i < b.stage2.thieves.length; i++) {
+      const idx = b.stage2.thieves[i];
+      const r = Math.floor(idx / b.n);
+      const c = idx % b.n;
+      const ev = onTap(s, r, c, 'double', tuning);
+      assert.equal(ev.type, 'thiefFound', `${b.id} thief ${i+1} found`);
+    }
+
+    // all k caught → won
+    assert.equal(s.thievesFound, b.stage2.k, `${b.id} all ${b.stage2.k} thieves found`);
+    assert.equal(s.status, 'won', `${b.id} status is won after all thieves caught`);
+  }
+});
+
+test('G12 — stage-2 wrong accusation: costs heart if wrongHideoutCostsHeart, cell returns to pre-tap state', () => {
+  const b = L4;
+  const s = createSession(b, tuning);
+  // solve stage 1
+  for (let r = 0; r < b.n; r++) {
+    onTap(s, r, b.solution[r], 'double', tuning);
+  }
+  enterStage2(s);
+
+  // find a non-thief AUTO_X cell
+  const n = b.n;
+  let wrongIdx = -1;
+  for (let i = 0; i < n * n; i++) {
+    if (s.cellState[i] === AUTO_X && !b.stage2.thiefSet.has(i)) {
+      wrongIdx = i;
+      break;
+    }
+  }
+  assert.ok(wrongIdx >= 0, 'found a non-thief AUTO_X cell');
+  const wr = Math.floor(wrongIdx / n);
+  const wc = wrongIdx % n;
+  const heartsBefore = s.hearts;
+
+  const ev = onTap(s, wr, wc, 'double', tuning);
+  assert.equal(ev.type, 'thiefWrong', 'wrong accusation returns thiefWrong');
+  assert.equal(s.hearts, heartsBefore - 1, 'wrong accusation costs 1 heart (wrongHideoutCostsHeart=true)');
+  // cell returns to pre-tap state (AUTO_X — we never mutated it)
+  assert.equal(s.cellState[wrongIdx], AUTO_X, 'wrong cell returns to pre-tap AUTO_X');
+});
+
+test('G12 — stage-2 THIEF is terminal: ack only, no further transitions', () => {
+  const b = L4;
+  const s = createSession(b, tuning);
+  for (let r = 0; r < b.n; r++) {
+    onTap(s, r, b.solution[r], 'double', tuning);
+  }
+  enterStage2(s);
+
+  // catch first thief
+  const idx = b.stage2.thieves[0];
+  const r = Math.floor(idx / b.n);
+  const c = idx % b.n;
+  onTap(s, r, c, 'double', tuning);
+  assert.equal(s.cellState[idx], THIEF);
+
+  // THIEF is terminal — both gestures ack only
+  assert.equal(onTap(s, r, c, 'single', tuning).type, 'terminal');
+  assert.equal(onTap(s, r, c, 'double', tuning).type, 'terminal');
+  assert.equal(s.cellState[idx], THIEF, 'THIEF stays THIEF');
+});
+
+test('G13 — stage-2 OFFICER is still terminal: ack only', () => {
+  const b = L4;
+  const s = createSession(b, tuning);
+  for (let r = 0; r < b.n; r++) {
+    onTap(s, r, b.solution[r], 'double', tuning);
+  }
+  enterStage2(s);
+
+  // find an officer cell
+  const n = b.n;
+  let officerIdx = -1;
+  for (let i = 0; i < n * n; i++) {
+    if (s.cellState[i] === OFFICER) { officerIdx = i; break; }
+  }
+  const r = Math.floor(officerIdx / n);
+  const c = officerIdx % n;
+  assert.equal(onTap(s, r, c, 'single', tuning).type, 'terminal');
+  assert.equal(onTap(s, r, c, 'double', tuning).type, 'terminal');
+});
+
+test('stage-2 fail: drain hearts → failed; retry resets to stage 1', () => {
+  const b = L4;
+  const s = createSession(b, tuning);
+  for (let r = 0; r < b.n; r++) {
+    onTap(s, r, b.solution[r], 'double', tuning);
+  }
+  enterStage2(s);
+
+  // find non-thief AUTO_X cells to accuse wrong
+  const n = b.n;
+  const wrongCells = [];
+  for (let i = 0; i < n * n && wrongCells.length < 3; i++) {
+    if (s.cellState[i] === AUTO_X && !b.stage2.thiefSet.has(i)) {
+      wrongCells.push(i);
+    }
+  }
+  // with 3 hearts, 3 wrong accusations → failed
+  for (let i = 0; i < wrongCells.length; i++) {
+    const r = Math.floor(wrongCells[i] / n);
+    const c = wrongCells[i] % n;
+    const ev = onTap(s, r, c, 'double', tuning);
+    assert.equal(ev.type, 'thiefWrong');
+  }
+  assert.equal(s.hearts, 0);
+  assert.equal(s.status, 'failed');
+
+  // retry resets to stage 1
+  retry(s, tuning);
+  assert.equal(s.stage, 1, 'retry resets to stage 1');
+  assert.equal(s.thievesFound, 0, 'retry resets thievesFound');
+  assert.equal(s.status, 'playing');
+  assert.equal(s.hearts, tuning.hearts);
+  assert.equal(countState(s, EMPTY), b.n * b.n);
+});
+
+test('retry from stage 1: full two-act reset', () => {
+  const b = L4;
+  const s = createSession(b, tuning);
+  onTap(s, 0, b.solution[0], 'double', tuning); // place one officer
+  retry(s, tuning);
+  assert.equal(s.stage, 1);
+  assert.equal(s.thievesFound, 0);
+  assert.equal(s.placedCount, 0);
+  assert.equal(countState(s, EMPTY), b.n * b.n);
+});
+
+test('board.stage2 data: k, thieves, thiefSet, hideSteps wired from baked data', () => {
+  for (const b of [L4, L5, L6]) {
+    assert.ok(b.stage2.k > 0, `${b.id} has stage2.k > 0`);
+    assert.equal(b.stage2.thieves.length, b.stage2.k, `${b.id} thieves array length = k`);
+    assert.equal(b.stage2.thiefSet.size, b.stage2.k, `${b.id} thiefSet size = k`);
+    assert.ok(b.stage2.hideSteps.length >= b.stage2.k, `${b.id} has hideSteps`);
+    assert.ok(b.stage2.thiefRatio > 0 && b.stage2.thiefRatio <= 1, `${b.id} thiefRatio in (0,1]`);
+  }
 });
 
 function countState(s, v) {

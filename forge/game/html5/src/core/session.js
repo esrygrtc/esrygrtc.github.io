@@ -9,8 +9,11 @@
 //   AUTO_X      — rejects both gestures (blocked), no heart ever
 //   OFFICER     — terminal in P1: ack-only, no transitions
 // unplace/recomputeElimination are gone — only correct officers ever land.
+//
+// #143 Option II — two-act session: stage 1 (cop-solve) → stage 2 (FIND thieves).
+// Act 2 reuses MARK for suspect pencil-marks; double-tap accuses THIEF.
 
-import { EMPTY, MARK, OFFICER, AUTO_X } from './board.js';
+import { EMPTY, MARK, OFFICER, AUTO_X, THIEF } from './board.js';
 import { eliminationGroups, completedRegions } from './rules.js';
 
 export function createSession(board, tuning) {
@@ -22,6 +25,9 @@ export function createSession(board, tuning) {
     placedCount: 0,
     seedLog: board.id, // provenance: pool id of the baked board
     announced: new Set(), // regions already announced complete
+    // #143 Option II — stage-2 state
+    stage: 1,            // 1 = cop-solve (DAY), 2 = FIND thieves (NIGHT)
+    thievesFound: 0,     // count of caught thieves in act 2
   };
 }
 
@@ -39,10 +45,43 @@ export function onTap(session, r, c, gesture, tuning) {
   const st = session.cellState[idx];
 
   // 2. BLOCKED: system-crossed cell rejects both gestures. No heart, ever.
-  if (st === AUTO_X) return { type: 'blocked', cell: { r, c }, hearts: session.hearts, status: session.status };
+  //    In stage 2, AUTO_X cells are searchable — NOT blocked (§3).
+  if (st === AUTO_X && session.stage === 1) return { type: 'blocked', cell: { r, c }, hearts: session.hearts, status: session.status };
 
-  // 3. OFFICER is terminal in P1 — ack only, nothing else.
+  // 3. OFFICER is terminal — ack only, nothing else (both stages).
   if (st === OFFICER) return { type: 'terminal', cell: { r, c }, hearts: session.hearts, status: session.status };
+
+  // 3b. THIEF is terminal — ack only (stage 2).
+  if (st === THIEF) return { type: 'terminal', cell: { r, c }, hearts: session.hearts, status: session.stage };
+
+  // ════════════════════════════════════════════════════════════════════
+  // STAGE 2 — FIND the hidden thieves (Option II, §3)
+  // ════════════════════════════════════════════════════════════════════
+  if (session.stage === 2) {
+    // Only AUTO_X cells are searchable (OFFICER/THIEF handled above).
+    // MARK cells: single toggles back to AUTO_X (erase), double accuses.
+    if (st === MARK) {
+      if (gesture === 'single') {
+        session.cellState[idx] = AUTO_X;
+        return { type: 'erase', cell: { r, c }, hearts: session.hearts, status: session.status };
+      }
+      // double-tap from MARK = accuse
+      return accuseThief(session, board, r, c, idx, tuning);
+    }
+
+    // st === AUTO_X (searchable)
+    if (gesture === 'single') {
+      session.cellState[idx] = MARK;
+      return { type: 'mark', cell: { r, c }, hearts: session.hearts, status: session.status };
+    }
+
+    // double-tap on AUTO_X = accuse
+    return accuseThief(session, board, r, c, idx, tuning);
+  }
+
+  // ════════════════════════════════════════════════════════════════════
+  // STAGE 1 — cop-solve (DAY, original §4.2 grammar)
+  // ════════════════════════════════════════════════════════════════════
 
   // 4. single tap — TOGGLE EMPTY ⇄ MARK. Free in either direction (AC#5).
   if (gesture === 'single') {
@@ -50,6 +89,7 @@ export function onTap(session, r, c, gesture, tuning) {
       session.cellState[idx] = MARK;
       return { type: 'mark', cell: { r, c }, hearts: session.hearts, status: session.status };
     }
+    // st === MARK → erase
     session.cellState[idx] = EMPTY;
     return { type: 'erase', cell: { r, c }, hearts: session.hearts, status: session.status };
   }
@@ -65,10 +105,13 @@ export function onTap(session, r, c, gesture, tuning) {
     for (let i = 0; i < done.length; i++) {
       if (!session.announced.has(done[i])) { session.announced.add(done[i]); regionsCompleted.push(done[i]); }
     }
-    if (session.placedCount === n) session.status = 'won';
+    // #143: do NOT set status='won' on full solve — return solvedBoard flag
+    // so main.js can run bloom→flip→enterStage2. status stays 'playing'.
+    const solvedBoard = session.placedCount === n;
     return {
       type: 'place', cell: { r, c }, cascade, regionsCompleted,
       hearts: session.hearts, status: session.status,
+      solvedBoard,
     };
   }
 
@@ -79,6 +122,40 @@ export function onTap(session, r, c, gesture, tuning) {
   return { type: 'wrong', cell: { r, c }, hearts: session.hearts, status: session.status };
 }
 
+// #143 §3 — thief accusation (stage 2 double-tap on searchable cell)
+function accuseThief(session, board, r, c, idx, tuning) {
+  const s2 = board.stage2;
+  if (s2.thiefSet.has(idx)) {
+    // CORRECT — thief caught!
+    session.cellState[idx] = THIEF;
+    session.thievesFound++;
+    const remaining = s2.k - session.thievesFound;
+    // find this thief's hideStep metadata for analytics
+    const order = session.thievesFound; // 1-based
+    const hideStep = s2.hideSteps.find(s => s.r === r && s.c === c);
+    const depth = hideStep ? hideStep.depth : 0;
+    const watchers = hideStep ? hideStep.watchers : 0;
+    if (session.thievesFound === s2.k) {
+      session.status = 'won';
+    }
+    return {
+      type: 'thiefFound', cell: { r, c }, order, depth, watchers,
+      remaining, hearts: session.hearts, status: session.status,
+    };
+  }
+
+  // WRONG accusation
+  if (tuning.stage2 && tuning.stage2.wrongHideoutCostsHeart) {
+    session.hearts--;
+    if (session.hearts === 0) session.status = 'failed';
+  }
+  // cell returns to pre-tap state (AUTO_X or MARK — we never mutated it)
+  return {
+    type: 'thiefWrong', cell: { r, c },
+    hearts: session.hearts, status: session.status,
+  };
+}
+
 function applyCascade(session, groups) {
   const order = ['row', 'column', 'diagonals', 'region'];
   for (let g = 0; g < order.length; g++) {
@@ -87,12 +164,20 @@ function applyCascade(session, groups) {
   }
 }
 
-// spec §4.5 — single-tap instant retry: same board, cellState cleared.
+// #143 §4 — enterStage2: mutates NO cell state. Flips stage flag only.
+// The palette/chrome flip is handled by main.js + boardRenderer.js.
+export function enterStage2(session) {
+  session.stage = 2;
+}
+
+// spec §4.5 — retry: same board, full two-act reset.
 export function retry(session, tuning) {
   session.cellState.fill(EMPTY);
   session.hearts = tuning.hearts;
   session.status = 'playing';
   session.placedCount = 0;
   session.announced = new Set();
+  session.stage = 1;
+  session.thievesFound = 0;
   return session;
 }

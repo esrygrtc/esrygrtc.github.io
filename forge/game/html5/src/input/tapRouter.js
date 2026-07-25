@@ -10,12 +10,20 @@
 //     Window expires → erase fires, 90ms reversed tween plays.
 //   Supersede-cancel (tap 2 inside window on a just-marked cell):
 //     in-flight mark tween killed same-frame (≤16ms, no penalty tween).
+//
+// #143 Option II — stage-2 routing: mark/erase on AUTO_X cells, thiefFound/
+// thiefWrong on double-tap accuse. Gates during bloom/flip (ack-only).
 
 import { RECT_SLOTS } from '../render/layout.js';
-import { fxAck, fxMark, fxUnmark, fxPlace, fxCascade, fxRegionPulse, fxShake, fxBlockedPulse, fxHeartLoss, killTweenByCell, TW_MARK } from '../render/fx.js';
+import {
+  fxAck, fxMark, fxUnmark, fxPlace, fxCascade, fxRegionPulse,
+  fxBlockedPulse, fxHeartLoss, fxWrongCell, fxThiefFound,
+  killTweenByCell, TW_MARK,
+} from '../render/fx.js';
 import { markDirty } from '../render/boardRenderer.js';
 import {
   sfxMark, sfxPlace, sfxCascade, sfxBlocked, sfxWrong, sfxRegion, sfxUi, sfxUnlock,
+  sfxCatchCuff,
 } from '../audio/sfx.js';
 import { onTap } from '../core/session.js';
 import { EMPTY, MARK, OFFICER, AUTO_X } from '../core/board.js';
@@ -33,9 +41,6 @@ export function attachTapRouter(canvas, G) {
   let lastDownMs = -1e9;
 
   // AMENDMENT 6 — deferred toggle-commit erase for MARK cells.
-  // On tap 1 on a MARK cell, we do NOT erase immediately: the player might
-  // be starting a double-tap (which commits from MARK). The erase fires only
-  // when the double-tap window expires without a second tap.
   let eraseTimerId = null;
   let eraseCell = -1;
 
@@ -78,9 +83,8 @@ export function attachTapRouter(canvas, G) {
       }
     }
 
-    // catch cutscene: skippable after skippableAfterMs (row 7; lock ≤600ms)
-    if (G.ui.phase === 'catch') { G.onCatchTap(); return; }
-    if (G.ui.phase !== 'play') return;
+    // #143: gate during bloom/flip — ack only, no board taps
+    if (G.ui.phase !== 'play' && G.ui.phase !== 'find') return;
 
     // board hit-test
     const cellIdx = hitCell(G.layout, G.board.n, x, y);
@@ -89,15 +93,12 @@ export function attachTapRouter(canvas, G) {
     const r = (cellIdx / G.board.n) | 0;
     const c = cellIdx % G.board.n;
 
-    // spec §4.2 — ACK FIRST, unconditional, before classification: visual pop
-    // + light haptic, SILENT (row 1: a sounded ack would double-fire on a
-    // double-tap).
+    // spec §4.2 — ACK FIRST, unconditional, before classification
     fxAck(G.fx, cellIdx);
     buzz(8);
     markDirty(G.renderer);
 
     // spec §4.5: heart-loss input pause (1500ms, tunable) — ack still fired
-    // (every input acknowledged), rules work is gated.
     if (G.clock < (G.inputLockedUntil || 0)) return;
 
     const now = performance.now();
@@ -120,25 +121,47 @@ export function attachTapRouter(canvas, G) {
     lastCell = cellIdx;
 
     const st = G.session.cellState[cellIdx];
+    const stage = G.session.stage;
 
-    if (st === EMPTY) {
-      // Mark appears IMMEDIATELY (PULSE v4: "row 2's tween ALWAYS starts on
-      // tap 1 within the ≤50ms ack budget — NEVER wait for window expiry")
-      const ev = onTap(G.session, r, c, 'single', G.tuning);
-      routeEvent(G, ev, cellIdx);
-      markDirty(G.renderer);
-    } else if (st === MARK) {
-      // AMENDMENT 6 — DEFER erase to window-expiry (toggle-commit). If tap 2
-      // arrives inside the window, the double-tap commits from MARK and the
-      // erase is canceled (supersede). Mark stays visible until expiry.
-      if (eraseTimerId !== null) { clearTimeout(eraseTimerId); eraseCell = -1; }
-      eraseCell = cellIdx;
-      eraseTimerId = setTimeout(firePendingErase, G.feel.doubleTapWindowMs);
+    if (stage === 1) {
+      // ════════════════════════════════════════════════════════════════
+      // STAGE 1 — original AMENDMENT 2+6 grammar
+      // ════════════════════════════════════════════════════════════════
+      if (st === EMPTY) {
+        const ev = onTap(G.session, r, c, 'single', G.tuning);
+        routeEvent(G, ev, cellIdx);
+        markDirty(G.renderer);
+      } else if (st === MARK) {
+        // AMENDMENT 6 — DEFER erase to window-expiry (toggle-commit)
+        if (eraseTimerId !== null) { clearTimeout(eraseTimerId); eraseCell = -1; }
+        eraseCell = cellIdx;
+        eraseTimerId = setTimeout(firePendingErase, G.feel.doubleTapWindowMs);
+      } else {
+        // OFFICER (terminal) or AUTO_X (blocked) — fire immediately
+        const ev = onTap(G.session, r, c, 'single', G.tuning);
+        routeEvent(G, ev, cellIdx);
+        markDirty(G.renderer);
+      }
     } else {
-      // OFFICER (terminal) or AUTO_X (blocked) — fire immediately
-      const ev = onTap(G.session, r, c, 'single', G.tuning);
-      routeEvent(G, ev, cellIdx);
-      markDirty(G.renderer);
+      // ════════════════════════════════════════════════════════════════
+      // STAGE 2 — FIND grammar (§3): AUTO_X ⇄ MARK, double = accuse
+      // ════════════════════════════════════════════════════════════════
+      if (st === AUTO_X) {
+        // single → mark (suspect pencil), double → accuse (handled above)
+        const ev = onTap(G.session, r, c, 'single', G.tuning);
+        routeEvent(G, ev, cellIdx);
+        markDirty(G.renderer);
+      } else if (st === MARK) {
+        // same deferred logic as stage 1: erase on window expiry, accuse on double
+        if (eraseTimerId !== null) { clearTimeout(eraseTimerId); eraseCell = -1; }
+        eraseCell = cellIdx;
+        eraseTimerId = setTimeout(firePendingErase, G.feel.doubleTapWindowMs);
+      } else {
+        // OFFICER / THIEF (terminal) — fire immediately
+        const ev = onTap(G.session, r, c, 'single', G.tuning);
+        routeEvent(G, ev, cellIdx);
+        markDirty(G.renderer);
+      }
     }
   };
   canvas.addEventListener('pointerdown', handler, { passive: false });
@@ -163,17 +186,14 @@ function routeEvent(G, ev, cellIdx) {
       buzz(10);
       break;
     case 'erase':
-      // AMENDMENT 6 — toggle-commit mark-off: 90ms reversed tween (ONLY on
-      // window-expiry; supersede-cancel kills the mark same-frame with no tween)
       fxUnmark(G.fx, cellIdx);
       sfxMark(G.sfx);
       buzz(10);
       break;
     case 'terminal':
-      // OFFICER is terminal in P1 — ack already fired; nothing else.
+      // OFFICER/THIEF is terminal — ack already fired; nothing else.
       break;
     case 'place': {
-      // SUPERSEDE: kill any in-flight mark tween on this cell (≤16ms same-frame)
       killTweenByCell(G.fx, cellIdx, TW_MARK);
       fxPlace(G.fx, cellIdx);
       sfxPlace(G.sfx);
@@ -184,18 +204,36 @@ function routeEvent(G, ev, cellIdx) {
         fxRegionPulse(G.fx, G.board, reg, n);
         sfxRegion(G.sfx);
       }
-      if (ev.status === 'won') G.onSolve();
+      // #143: stage-1 solve → bloom→flip (NOT 'won')
+      if (ev.solvedBoard) G.onSolve();
       break;
     }
     case 'blocked':
-      // PULSE v4 row 10 — neutral scale pulse; NO shake, NO rim, NO heart
       fxBlockedPulse(G.fx, cellIdx);
-      sfxBlocked(G.sfx); // T0 sub-light, SILENT per v4
+      sfxBlocked(G.sfx);
       break;
     case 'wrong':
       fxHeartLoss(G.fx, cellIdx, ev.hearts);
       sfxWrong(G.sfx);
       buzz([24, 40, 24]);
+      G.inputLockedUntil = G.clock + G.tuning.heartLossPauseMs;
+      if (ev.status === 'failed') G.onFail();
+      break;
+    // ════════════════════════════════════════════════════════════════
+    // #143 Option II — stage-2 events
+    // ════════════════════════════════════════════════════════════════
+    case 'thiefFound':
+      killTweenByCell(G.fx, cellIdx, TW_MARK);
+      fxThiefFound(G.fx, cellIdx);
+      sfxCatchCuff(G.sfx);
+      buzz([20, 30, 20]);
+      if (ev.status === 'won') G.onStage2Clear();
+      break;
+    case 'thiefWrong':
+      // Row 15 — amber rim + gentle ±2px shake
+      fxWrongCell(G.fx, cellIdx);
+      sfxWrong(G.sfx);
+      buzz([15, 30, 15]);
       G.inputLockedUntil = G.clock + G.tuning.heartLossPauseMs;
       if (ev.status === 'failed') G.onFail();
       break;
