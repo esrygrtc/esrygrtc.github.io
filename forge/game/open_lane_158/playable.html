@@ -740,6 +740,12 @@ async function boot(){
   levelsReady=true;
   playBtn.disabled=false;
   playBtn.textContent="PLAY";
+  // P8 cold-boot: pre-decode audio in background during boot.
+  // A suspended AudioContext can still decodeAudioData — resume happens on
+  // first user gesture (PLAY tap or first block drag).  This eliminates the
+  // first-touch decode lockout on BOTH the menu path and the ?level= deep-link.
+  audioBus.contextOrNull();
+  try{await audioBus.preload()}catch{}
 }
 
 // T2/PULSE — PLAY gesture: visual ack via CSS :active, audio init on user gesture, decode before board
@@ -748,11 +754,8 @@ playBtn.addEventListener("click",async()=>{
   // CSS :active already acknowledged in ≤50ms; update label for transition gap
   playBtn.textContent="LOADING…";
   playBtn.disabled=true;
-  // User gesture: create + resume AudioContext (P8 · PULSE cold-boot fix)
-  audioBus.contextOrNull();
+  // User gesture: resume the AudioContext (already decoded during boot)
   audioBus.unlock();
-  // Finish decode before gameplay (PULSE order) — board pointers never await
-  try{await audioBus.preload()}catch{}
   // Show board at L1 (or ?level= param)
   load(new URLSearchParams(location.search).get("level") in levels?new URLSearchParams(location.search).get("level"):"L1");
   showScreen("game");
