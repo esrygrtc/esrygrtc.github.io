@@ -156,6 +156,24 @@ assert.equal(timingById.boot_to_actionable.code_segment_start, "PerformanceNavig
 assert.match(timingById.boot_to_actionable.network_segment, /REPORTED_NOT_GATED/, "the navigation term is reported, never gated");
 assert.match(timingById.boot_to_actionable.audio_contract, /ready === true/, "audio must be decoded before the board is actionable");
 assert.equal(timingById.exit_echo_playable.duration_ms, 540, "exit→echo→playable chain is exactly 540 ms");
+
+const ack = timingById.pointerdown_ack;
+assert.equal(ack.first_visible_change_max_ms, 16.7, "ack budget is 16.7 ms");
+assert.match(ack.measurement_ownership.headless, /STRUCTURAL_ONLY/, "headless owns the structural property only");
+assert.match(ack.measurement_ownership.headless, /never pass or fail the 16\.7ms number/, "headless must not verdict the number");
+assert.match(ack.measurement_ownership.numeric, /OWNER_DEVICE_ONLY/, "the number is an owner-device measurement");
+
+// The structural substitute is only valid while the ack-carrying component is
+// transition-free. Pin .block-cell, not .block: the block legitimately carries
+// the 48 ms grabbed-scale transition.
+const ackRule = html.match(/\.block\.grabbed \.block-cell\{([^}]*)\}/);
+assert.ok(ackRule, "the shipped ack rule .block.grabbed .block-cell exists");
+assert.match(ackRule[1], /outline:3px solid #fff/, "the ack is a 3px white outline");
+const cellBase = html.match(/\n\.block-cell\{([^}]*)\}/);
+assert.ok(cellBase, ".block-cell base rule exists");
+assert.doesNotMatch(cellBase[1], /transition/, "the ack-carrying component must stay transition-free");
+assert.doesNotMatch(ackRule[1], /transition/, "the ack rule itself must stay transition-free");
+
 assert.ok(html.includes(`const INLINE_TIMING = ${JSON.stringify(timing)};`), "generated playable embeds timing.json verbatim");
 
 const manifest = JSON.parse(readFileSync(new URL("./audio/manifest.json", import.meta.url), "utf8"));
