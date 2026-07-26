@@ -6,7 +6,7 @@
 <meta name="theme-color" content="#10141b">
 <title>OPEN LANE — P1 Greybox</title>
 <style>
-:root{color-scheme:dark;--cell:60px;--ease-out-cubic:cubic-bezier(0.33,1,0.68,1);--amber:#ffb41f;--teal:#23c6c3;--violet:#964bd3;--lime:#f35b57;--art-background:none;--art-tile-a:none;--art-tile-b:none;--art-frame-corner:none;--art-frame-h:none;--art-frame-v:none;--art-amber:none;--art-teal:none;--art-violet:none;--art-lime:none}
+:root{color-scheme:dark;--cell:60px;--ease-out-cubic:cubic-bezier(0.33,1,0.68,1);--ack-ms:50ms;--amber:#ffb41f;--teal:#23c6c3;--violet:#964bd3;--lime:#f35b57;--art-background:none;--art-tile-a:none;--art-tile-b:none;--art-frame-corner:none;--art-frame-h:none;--art-frame-v:none;--art-amber:none;--art-teal:none;--art-violet:none;--art-lime:none}
 *{box-sizing:border-box}
 html,body{margin:0;min-height:100%;overflow:hidden;background:#123f5c var(--art-background) center/cover no-repeat;color:#fff0cc;font-family:ui-rounded,system-ui,sans-serif;touch-action:none}
 body{display:flex;justify-content:center}
@@ -61,6 +61,32 @@ button[aria-current=true]{border-color:#e9f1f8;background:#354353}
 #chip.show{display:block}
 #controls{display:flex;gap:8px;justify-content:center;padding-bottom:4px}
 #principle{color:#9bb0bd;font-size:10px;text-align:center}
+/* T2/T3/T8 — shell screens (#160) · P7: ≤50ms ack via --ack-ms · P8: audio init on PLAY gesture */
+.screen-overlay{position:fixed;inset:0;z-index:50;display:none;flex-direction:column;align-items:center;justify-content:center;gap:22px;background:rgba(16,20,27,.94);-webkit-backdrop-filter:blur(10px);backdrop-filter:blur(10px);padding:20px}
+.screen-overlay.show{display:flex}
+.big-play{min-width:190px;min-height:74px;font-size:28px;font-weight:900;letter-spacing:.15em;border-radius:22px;transition:transform var(--ack-ms) var(--ease-out-cubic)}
+.big-play:active{transform:scale(.94)}
+.big-play:disabled{opacity:.55}
+.icon-btn{position:fixed;top:max(12px,env(safe-area-inset-top));right:14px;z-index:49;width:44px;height:44px;border-radius:50%;font-size:20px;display:grid;place-items:center;transition:transform var(--ack-ms) var(--ease-out-cubic);background:rgba(37,47,59,.85);color:#fff0cc}
+.icon-btn:active{transform:scale(.92)}
+.result-card{display:flex;flex-direction:column;align-items:center;gap:18px;padding:36px 30px;border-radius:22px;background:#1a2735;border:1px solid #3a4a5a;max-width:320px;text-align:center}
+.result-card h2{margin:0;font-size:26px;letter-spacing:.1em}
+.result-card.complete h2{color:#b8ef95}
+.result-card.fail h2{color:#ff6b6b}
+.result-card p{margin:0;font-size:13px;color:#aab4c0;line-height:1.5}
+.result-btns{display:flex;gap:12px}
+.result-btns button{transition:transform var(--ack-ms) var(--ease-out-cubic);min-height:48px}
+.result-btns button:active{transform:scale(.94)}
+.settings-card{display:flex;flex-direction:column;gap:14px;padding:26px 22px;border-radius:22px;background:#1a2735;border:1px solid #3a4a5a;min-width:270px}
+.settings-card h3{margin:0 0 6px;font-size:16px;letter-spacing:.1em}
+.toggle-row{display:flex;align-items:center;justify-content:space-between;font-size:15px}
+.toggle{width:50px;height:30px;border-radius:15px;background:#3a4a5a;border:0;position:relative;transition:background var(--ack-ms) var(--ease-out-cubic);cursor:pointer;min-width:50px;min-height:30px}
+.toggle::after{content:"";position:absolute;top:3px;left:3px;width:24px;height:24px;border-radius:50%;background:#fff;transition:transform var(--ack-ms) var(--ease-out-cubic)}
+.toggle.on{background:var(--teal)}
+.toggle.on::after{transform:translateX(20px)}
+.settings-card>button{min-height:44px;transition:transform var(--ack-ms) var(--ease-out-cubic)}
+.settings-card>button:active{transform:scale(.95)}
+.menu-title{font-size:34px;letter-spacing:.18em;margin:0;text-shadow:0 2px 12px rgba(0,0,0,.5)}
 </style>
 </head>
 <body>
@@ -73,6 +99,44 @@ button[aria-current=true]{border-color:#e9f1f8;background:#354353}
   <div id="playfield"><div id="frame-art" aria-hidden="true"><i class="top"></i><i class="right"></i><i class="bottom"></i><i class="left"></i><i class="corner nw"></i><i class="corner ne"></i><i class="corner se"></i><i class="corner sw"></i></div><div id="board" aria-label="Puzzle board"><div id="chip"></div></div></div>
   <div id="controls"><button id="undo" type="button">Undo</button><button id="restart" type="button">Restart</button></div>
   <div id="principle">Greybox · colour + symbol · free recovery</div>
+  <!-- T2: Menu screen — title + one PLAY button + settings icon -->
+  <div id="screen-menu" class="screen-overlay show">
+    <h1 class="menu-title">OPEN LANE</h1>
+    <button class="big-play" id="play-btn" type="button" disabled>LOADING…</button>
+  </div>
+  <!-- T3: Level Complete -->
+  <div id="screen-complete" class="screen-overlay">
+    <div class="result-card complete">
+      <h2>LEVEL CLEAR</h2>
+      <div class="result-btns">
+        <button id="next-btn" type="button">NEXT</button>
+        <button id="home-complete" type="button">HOME</button>
+      </div>
+    </div>
+  </div>
+  <!-- T3: Fail / Dead End -->
+  <div id="screen-fail" class="screen-overlay">
+    <div class="result-card fail">
+      <h2>DEAD END</h2>
+      <p>No way to clear this board.</p>
+      <div class="result-btns">
+        <button id="retry-btn" type="button">RETRY</button>
+        <button id="home-fail" type="button">HOME</button>
+      </div>
+    </div>
+  </div>
+  <!-- T8: Settings panel -->
+  <div id="screen-settings" class="screen-overlay">
+    <div class="settings-card">
+      <h3>SETTINGS</h3>
+      <div class="toggle-row"><span>Sound</span><button class="toggle on" id="toggle-sound" type="button" aria-label="Sound"></button></div>
+      <div class="toggle-row"><span>Music</span><button class="toggle on" id="toggle-music" type="button" aria-label="Music"></button></div>
+      <button id="settings-restart" type="button">Restart Level</button>
+      <button id="settings-back" type="button">Back</button>
+    </div>
+  </div>
+  <!-- T8: Settings icon -->
+  <button class="icon-btn" id="settings-open" type="button" aria-label="Settings">⚙</button>
 </main>
 <script type="module">
 // OPEN LANE #158 — pure deterministic model. No DOM, clocks, RNG, or globals.
@@ -358,6 +422,18 @@ const tabs = document.querySelector("#level-tabs");
 const chip = document.querySelector("#chip");
 const undoButton = document.querySelector("#undo");
 const restartButton = document.querySelector("#restart");
+// T2/T3/T8 shell elements
+const playBtn = document.querySelector("#play-btn");
+const nextBtn = document.querySelector("#next-btn");
+const retryBtn = document.querySelector("#retry-btn");
+const homeCompleteBtn = document.querySelector("#home-complete");
+const homeFailBtn = document.querySelector("#home-fail");
+const settingsOpen = document.querySelector("#settings-open");
+const settingsBack = document.querySelector("#settings-back");
+const settingsRestart = document.querySelector("#settings-restart");
+const toggleSoundBtn = document.querySelector("#toggle-sound");
+const toggleMusicBtn = document.querySelector("#toggle-music");
+
 let levels = {};
 let levelId = "L1";
 let sourceLevel;
@@ -367,9 +443,25 @@ let drag = null;
 let timing = INLINE_TIMING;
 let audioEvents = INLINE_AUDIO_EVENTS;
 let lastChain = null;
+let levelsReady = false;
+let soundOn = true;
+let musicOn = true;
+let currentScreen = "menu";
 const SEARCH_CAP = 200000;
 const DEAD_END_MSG = "no way to clear this board — undo or restart";
 const sleep = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
+
+// T2/T3/T8 — screen manager: one overlay at a time, settings gear visibility
+function showScreen(name){
+  document.querySelectorAll(".screen-overlay").forEach((el) => el.classList.remove("show"));
+  currentScreen = name;
+  if(name === "menu") document.querySelector("#screen-menu").classList.add("show");
+  else if(name === "complete") document.querySelector("#screen-complete").classList.add("show");
+  else if(name === "fail") document.querySelector("#screen-fail").classList.add("show");
+  else if(name === "settings") document.querySelector("#screen-settings").classList.add("show");
+  // Settings gear: visible on menu + game, hidden behind result/settings overlays
+  settingsOpen.style.display = (name === "game" || name === "menu") ? "" : "none";
+}
 
 // R10′ dead-end detection — bounded BFS on the shipped model after each exit settles.
 function _snapKey(st){return JSON.stringify(OL.snapshot(st))}
@@ -407,13 +499,16 @@ function checkDeadEnd(){
   if(OL.isClear(state))return;
   if(!isBoardSolvable(state)){
     chip.textContent=DEAD_END_MSG;chip.classList.add("show");
+    setTimeout(()=>{
+      if(!OL.isClear(state)&&phase!=="win"&&!isBoardSolvable(state)) showScreen("fail");
+    },1200);
   }
 }
 
 class AudioBus {
   constructor(){
     this.context=null;this.buffers=new Map();this.voices=Array.from({length:4},()=>({source:null,gain:null}));
-    this.cursor=0;this.warned=new Set();this.ready=false;
+    this.cursor=0;this.warned=new Set();this.ready=false;this.enabled=true;
   }
   contextOrNull(){
     if(this.context)return this.context;
@@ -434,6 +529,7 @@ class AudioBus {
   }
   unlock(){const context=this.contextOrNull();if(context?.state==="suspended")void context.resume()}
   play(id){
+    if(!this.enabled)return;
     const context=this.contextOrNull(),buffer=this.buffers.get(id);
     if(!context||!buffer){this.warnOnce(id,new Error("audio not decoded"));return}
     const config=audioEvents.events.find((event)=>event.id===id);
@@ -447,7 +543,7 @@ class AudioBus {
     if(this.warned.has(id))return;
     this.warned.add(id);console.warn(`OPEN LANE audio ${id}: ${error.message}`);
   }
-  status(){return{decoded:[...this.buffers.keys()].sort(),voices:this.voices.length,ready:this.ready}}
+  status(){return{decoded:[...this.buffers.keys()].sort(),voices:this.voices.length,ready:this.ready,enabled:this.enabled}}
 }
 const audioBus=new AudioBus();
 
@@ -597,6 +693,7 @@ function commitExitChain(id,gateId,element){
   setTimeout(()=>{
     phase=OL.isClear(state)?"win":"play";
     lastChain.inputReenabledAt=performance.now();
+    if(phase==="win") setTimeout(()=>{if(phase==="win") showScreen("complete")},350);
     if(phase==="play")checkDeadEnd();
   },chainMs);
 }
@@ -623,29 +720,91 @@ function debugExit(gateId){
   return false;
 }
 
+// T2/PULSE — boot shows menu immediately; levels + art load in background
 async function boot(){
   const art=installArt();
-  await Promise.all(Object.values(art).map((source)=>new Promise((resolve,reject)=>{const image=new Image();image.onload=resolve;image.onerror=reject;image.src=source})));
+  showScreen("menu");
+  // Background loading — menu is already visible and interactive
+  try{
+    await Promise.all(Object.values(art).map((source)=>new Promise((resolve,reject)=>{const image=new Image();image.onload=resolve;image.onerror=reject;image.src=source})));
+  }catch{ /* art optional for menu */ }
   if(!timing)timing=await fetch("../../game/design/motion/issue_158_open_lane/timing.json",{cache:"no-store"}).then((response)=>response.json());
   if(!audioEvents)audioEvents=await fetch("../../game/design/motion/issue_158_open_lane/event_map.json",{cache:"no-store"}).then((response)=>response.json());
   document.documentElement.style.setProperty("--ease-out-cubic",timing.easeOutCubic);
-  void audioBus.preload();
   if(INLINE_LEVELS) levels=INLINE_LEVELS;
   else for(const id of LEVEL_IDS)try{
     const response=await fetch(`./levels/${id}.json`,{cache:"no-store"});
     if(response.ok)levels[id]=await response.json();
   }catch{}
   if(!levels.L1)throw new Error("L1 unavailable");
-  load(new URLSearchParams(location.search).get("level") in levels?new URLSearchParams(location.search).get("level"):"L1");
+  levelsReady=true;
+  playBtn.disabled=false;
+  playBtn.textContent="PLAY";
 }
 
-undoButton.addEventListener("click",()=>{if(phase==="play"||phase==="win"){state=OL.undo(state);chip.classList.remove("show");render()}});
-restartButton.addEventListener("click",()=>{if(phase==="play"||phase==="win")load(levelId)});
+// T2/PULSE — PLAY gesture: visual ack via CSS :active, audio init on user gesture, decode before board
+playBtn.addEventListener("click",async()=>{
+  if(!levelsReady)return;
+  // CSS :active already acknowledged in ≤50ms; update label for transition gap
+  playBtn.textContent="LOADING…";
+  playBtn.disabled=true;
+  // User gesture: create + resume AudioContext (P8 · PULSE cold-boot fix)
+  audioBus.contextOrNull();
+  audioBus.unlock();
+  // Finish decode before gameplay (PULSE order) — board pointers never await
+  try{await audioBus.preload()}catch{}
+  // Show board at L1 (or ?level= param)
+  load(new URLSearchParams(location.search).get("level") in levels?new URLSearchParams(location.search).get("level"):"L1");
+  showScreen("game");
+});
+
+// T3 — Complete screen: NEXT advances or returns to menu
+nextBtn.addEventListener("click",()=>{
+  const idx=LEVEL_IDS.indexOf(levelId);
+  const nextId=idx>=0&&idx<LEVEL_IDS.length-1?LEVEL_IDS[idx+1]:null;
+  if(nextId&&levels[nextId]){load(nextId);showScreen("game")}
+  else showScreen("menu");
+});
+homeCompleteBtn.addEventListener("click",()=>showScreen("menu"));
+
+// T3 — Fail screen: RETRY reloads current level
+retryBtn.addEventListener("click",()=>{load(levelId);showScreen("game")});
+homeFailBtn.addEventListener("click",()=>showScreen("menu"));
+
+// T8 — Settings panel
+settingsOpen.addEventListener("click",()=>showScreen("settings"));
+settingsBack.addEventListener("click",()=>showScreen("game"));
+settingsRestart.addEventListener("click",()=>{load(levelId);showScreen("game")});
+toggleSoundBtn.addEventListener("click",()=>{
+  soundOn=!soundOn;
+  toggleSoundBtn.classList.toggle("on",soundOn);
+  audioBus.enabled=soundOn;
+});
+toggleMusicBtn.addEventListener("click",()=>{
+  musicOn=!musicOn;
+  toggleMusicBtn.classList.toggle("on",musicOn);
+});
+
+// Undo/restart also clear any open result overlay
+undoButton.addEventListener("click",()=>{
+  if(phase==="play"||phase==="win"){
+    state=OL.undo(state);chip.classList.remove("show");
+    if(currentScreen!=="game") showScreen("game");
+    render();
+  }
+});
+restartButton.addEventListener("click",()=>{
+  if(phase==="play"||phase==="win"){
+    load(levelId);
+    if(currentScreen!=="game") showScreen("game");
+  }
+});
 addEventListener("resize",()=>state&&render());
 
 window.olDebug={
   level:()=>levelId,
   phase:()=>phase,
+  screen:()=>currentScreen,
   result:()=>OL.isClear(state)?"clear":null,
   blocksLeft:()=>state.blocks.length,
   gates:()=>structuredClone(state.level.gates),
