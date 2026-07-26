@@ -145,9 +145,13 @@ assert.ok(html.includes("var(--art-tile-a)") && html.includes("var(--art-amber)"
 
 const feelRoot = new URL("../../game/design/motion/issue_158_open_lane/", import.meta.url);
 const timing = JSON.parse(readFileSync(new URL("timing.json", feelRoot), "utf8"));
-assert.equal(timing.beats.length, 9, "all nine PULSE rows are transcribed");
+assert.equal(timing.beats.length, 10, "all ten PULSE rows are transcribed");
+const timingById = Object.fromEntries(timing.beats.map((beat) => [beat.id, beat]));
+assert.equal(Object.keys(timingById).length, timing.beats.length, "PULSE timing row IDs are unique");
 assert.equal(timing.easeOutCubic, "cubic-bezier(0.33, 1, 0.68, 1)");
-assert.equal(timing.beats[6].duration_ms, 540, "exit→echo→playable chain is exactly 540 ms");
+assert.equal(timingById.boot_to_actionable.boot_to_actionable_max_ms, 300, "PLAY→board actionable ceiling is 300 ms");
+assert.equal(timingById.boot_to_actionable.clock_start, "accepted PLAY pointerdown", "boot budget starts on accepted PLAY");
+assert.equal(timingById.exit_echo_playable.duration_ms, 540, "exit→echo→playable chain is exactly 540 ms");
 assert.ok(html.includes(`const INLINE_TIMING = ${JSON.stringify(timing)};`), "generated playable embeds timing.json verbatim");
 
 const manifest = JSON.parse(readFileSync(new URL("./audio/manifest.json", import.meta.url), "utf8"));
