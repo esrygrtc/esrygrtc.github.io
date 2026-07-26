@@ -1,0 +1,401 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no,viewport-fit=cover">
+<meta name="theme-color" content="#10141b">
+<title>OPEN LANE — P1 Greybox</title>
+<style>
+:root{color-scheme:dark;--cell:60px;--ease-out-cubic:cubic-bezier(0.33,1,0.68,1);--amber:#ffb41f;--teal:#23c6c3;--violet:#964bd3;--lime:#f35b57;--art-background:none;--art-tile-a:none;--art-tile-b:none;--art-frame-corner:none;--art-frame-h:none;--art-frame-v:none;--art-amber:none;--art-teal:none;--art-violet:none;--art-lime:none}
+*{box-sizing:border-box}
+html,body{margin:0;min-height:100%;overflow:hidden;background:#123f5c var(--art-background) center/cover no-repeat;color:#fff0cc;font-family:ui-rounded,system-ui,sans-serif;touch-action:none}
+body{display:flex;justify-content:center}
+#app{width:min(100vw,430px);min-height:100dvh;padding:max(10px,env(safe-area-inset-top)) 12px max(10px,env(safe-area-inset-bottom));display:flex;flex-direction:column;align-items:center;gap:6px}
+header{width:100%;display:flex;align-items:flex-end;justify-content:space-between}
+h1{font-size:18px;letter-spacing:.12em;margin:0}
+#prompt{font-size:12px;color:#aab4c0;margin-top:3px}
+#level-tabs{display:flex;gap:5px}
+button{min-width:48px;min-height:40px;border:0;border-radius:14px;background:#fff0cc var(--art-frame-h) center/100% 100% no-repeat;color:#123f5c;font:800 13px system-ui;padding:8px 12px;box-shadow:0 5px 10px #061b2999}
+button:active{transform:scale(.97)}
+button[aria-current=true]{border-color:#e9f1f8;background:#354353}
+#playfield{position:relative;margin:8px auto 12px;flex:1 1 auto;display:flex;align-items:center;justify-content:center;width:100%}
+#frame-art{position:absolute;inset:-18px;z-index:0;pointer-events:none}
+#frame-art i{position:absolute;display:block;background-position:center;background-size:100% 100%;background-repeat:no-repeat}
+#frame-art .top,#frame-art .bottom{left:18px;right:18px;height:28px;background-image:var(--art-frame-h)}
+#frame-art .left,#frame-art .right{top:18px;bottom:18px;width:28px;background-image:var(--art-frame-v)}
+#frame-art .top{top:0}#frame-art .bottom{bottom:0;rotate:180deg}#frame-art .left{left:0}#frame-art .right{right:0;rotate:180deg}
+#frame-art .corner{width:38px;height:38px;background-image:var(--art-frame-corner)}
+#frame-art .nw{left:0;top:0}#frame-art .ne{right:0;top:0;rotate:90deg}#frame-art .se{right:0;bottom:0;rotate:180deg}#frame-art .sw{left:0;bottom:0;rotate:270deg}
+#board{position:relative;z-index:1;width:calc(var(--cell) * var(--cols));height:calc(var(--cell) * var(--rows));background:#123f5c;border:0;border-radius:10px;box-shadow:0 16px 38px #051b2999;overflow:visible}
+.grid-cell,.wall,.echo-ghost{position:absolute;width:var(--cell);height:var(--cell);pointer-events:none}
+.grid-cell{border:0;background-position:center;background-size:cover}
+.grid-cell.tile-a{background-image:var(--art-tile-a)}.grid-cell.tile-b{background-image:var(--art-tile-b)}
+.wall{background:#294c60 var(--art-tile-b) center/cover;border:3px solid #fff0cc88;box-shadow:inset 0 0 0 2px #0e3550}
+.echo-ghost{z-index:2;border:3px dashed currentColor;background:color-mix(in srgb,currentColor 18%,transparent);opacity:.7}
+.echo-ghost.extend::after{content:"+";position:absolute;inset:0;display:grid;place-items:center;font:900 22px system-ui}
+.echo-ghost.retract::after{content:"−";position:absolute;inset:0;display:grid;place-items:center;font:900 24px system-ui}
+.echo-ghost.skipped::before{content:"";position:absolute;left:6px;right:6px;top:50%;border-top:3px solid currentColor;transform:rotate(-25deg)}
+.gate{position:absolute;z-index:3;display:flex;align-items:center;justify-content:center;border:0;font-size:0;background-position:center;background-size:100% 100%;background-repeat:no-repeat;filter:drop-shadow(0 3px 4px #061b2999)}
+.gate.amber{background-image:var(--art-amber)}.gate.teal{background-image:var(--art-teal)}.gate.violet{background-image:var(--art-violet)}.gate.lime{background-image:var(--art-lime)}
+.gate[data-side=N]{height:28px;top:-22px}
+.gate[data-side=S]{height:28px;bottom:-22px}
+.gate[data-side=W]{width:28px;left:-22px}
+.gate[data-side=E]{width:28px;right:-22px}
+.block{position:absolute;z-index:5;left:0;top:0;touch-action:none;user-select:none;will-change:translate,scale,filter;scale:1;filter:drop-shadow(0 2px 3px rgba(0,0,0,.18));transition:scale 48ms var(--ease-out-cubic),filter 48ms var(--ease-out-cubic)}
+.block-cell{position:absolute;width:var(--cell);height:var(--cell);border-radius:9px;border:0;display:grid;place-items:center;font-size:0;background-position:center;background-size:100% 100%;background-repeat:no-repeat}
+.block.grabbed{scale:1.04;filter:drop-shadow(0 6px 6px rgba(0,0,0,.28));z-index:10}
+.block.grabbed .block-cell{outline:3px solid #fff}
+.gate.chain-flare{z-index:12}
+.echo-fx{position:absolute;z-index:13;width:var(--cell);height:var(--cell);pointer-events:none;border:4px solid currentColor;border-radius:8px}
+.echo-fx.retract{background:#697583;box-shadow:inset 0 0 0 2px #3d4752}
+.echo-fx.extend{background:currentColor}
+#board.clear-bloom{animation:clear-bloom 240ms var(--ease-out-cubic) both}
+@keyframes clear-bloom{from{filter:brightness(1) saturate(1)}to{filter:brightness(1.06) saturate(1.08)}}
+.amber{color:var(--amber)}.teal{color:var(--teal)}.violet{color:var(--violet)}.lime{color:var(--lime)}
+.block-cell.amber{background-image:var(--art-amber)}.block-cell.teal{background-image:var(--art-teal)}.block-cell.violet{background-image:var(--art-violet)}.block-cell.lime{background-image:var(--art-lime)}
+#status{width:100%;min-height:42px;display:flex;align-items:center;justify-content:center;text-align:center;color:#c6d0da;font-size:13px}
+#status.win{color:#b8ef95;font-weight:800}
+#status.win.chain-win{animation:win-chip 240ms var(--ease-out-cubic) 120ms both}
+@keyframes win-chip{from{opacity:0;transform:translateY(8px)}to{opacity:1;transform:translateY(0)}}
+#chip{position:absolute;z-index:20;left:50%;top:10px;transform:translateX(-50%);white-space:nowrap;background:#252f3b;border:1px solid #718093;border-radius:99px;padding:7px 12px;font-size:12px;display:none}
+#chip.show{display:block}
+#controls{display:flex;gap:8px;justify-content:center;padding-bottom:4px}
+#principle{color:#9bb0bd;font-size:10px;text-align:center}
+</style>
+</head>
+<body>
+<main id="app">
+  <header>
+    <div><h1>OPEN LANE</h1><div id="prompt">Slide each shape through its matching edge.</div></div>
+    <nav id="level-tabs" aria-label="Level select"></nav>
+  </header>
+  <section id="status" aria-live="polite">Loading greybox…</section>
+  <div id="playfield"><div id="frame-art" aria-hidden="true"><i class="top"></i><i class="right"></i><i class="bottom"></i><i class="left"></i><i class="corner nw"></i><i class="corner ne"></i><i class="corner se"></i><i class="corner sw"></i></div><div id="board" aria-label="Puzzle board"><div id="chip"></div></div></div>
+  <div id="controls"><button id="undo" type="button">Undo</button><button id="restart" type="button">Restart</button></div>
+  <div id="principle">Greybox · colour + symbol · free recovery</div>
+</main>
+<script type="module">
+import * as OL from "./model.js";
+const INLINE_LEVELS = null;
+const INLINE_TIMING = null;
+const INLINE_AUDIO_EVENTS = null;
+const INLINE_AUDIO = null;
+const INLINE_ART = null;
+const DEV_ART = Object.freeze({
+  background:"./art/background.webp","tile-a":"./art/tile-a.webp","tile-b":"./art/tile-b.webp",
+  "frame-corner":"./art/frame-corner.webp","frame-h":"./art/frame-h.webp","frame-v":"./art/frame-v.webp",
+  amber:"./art/amber.webp",teal:"./art/teal.webp",violet:"./art/violet.webp",lime:"./art/lime.webp"
+});
+
+const SYMBOL = {circle:"●",triangle:"▲",square:"■",cross:"✚"};
+const LEVEL_IDS = ["L1","L2","L3"];
+const board = document.querySelector("#board");
+const status = document.querySelector("#status");
+const tabs = document.querySelector("#level-tabs");
+const chip = document.querySelector("#chip");
+const undoButton = document.querySelector("#undo");
+const restartButton = document.querySelector("#restart");
+let levels = {};
+let levelId = "L1";
+let sourceLevel;
+let state;
+let phase = "boot";
+let drag = null;
+let timing = INLINE_TIMING;
+let audioEvents = INLINE_AUDIO_EVENTS;
+let lastChain = null;
+const SEARCH_CAP = 200000;
+const DEAD_END_MSG = "no way to clear this board — undo or restart";
+const sleep = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
+
+// R10′ dead-end detection — bounded BFS on the shipped model after each exit settles.
+function _snapKey(st){return JSON.stringify(OL.snapshot(st))}
+function _placementStates(st,blockId){
+  const out=[],seen=new Set([_snapKey(st)]),q=[st];
+  while(q.length){
+    const cur=q.shift();const b=cur.blocks.find(x=>x.id===blockId);if(!b)continue;
+    for(const [dx,dy] of [[1,0],[-1,0],[0,1],[0,-1]]){
+      if(!OL.legalStep(cur,blockId,dx,dy))continue;
+      const nxt=OL.applyDrag(cur,blockId,[b.at[0]+dx,b.at[1]+dy]);
+      const k=_snapKey(nxt);if(seen.has(k))continue;seen.add(k);out.push(nxt);q.push(nxt);
+    }
+  }
+  return out;
+}
+function isBoardSolvable(st){
+  const start=_snapKey(st);const nodes=new Map([[start,st]]);const q=[start];
+  while(q.length){
+    const k=q.shift(),cur=nodes.get(k);
+    if(OL.isClear(cur))return true;
+    const succ=[];
+    for(const b of cur.blocks){
+      for(const p of _placementStates(cur,b.id))succ.push(p);
+      const gid=OL.canExit(cur,b.id);if(gid)succ.push(OL.applyExit(cur,b.id,gid).state);
+    }
+    for(const s of succ){
+      const nk=_snapKey(s);if(nodes.has(nk))continue;
+      if(nodes.size>=SEARCH_CAP)return true; // assume solvable if search space too large
+      nodes.set(nk,s);q.push(nk);
+    }
+  }
+  return false;
+}
+function checkDeadEnd(){
+  if(OL.isClear(state))return;
+  if(!isBoardSolvable(state)){
+    chip.textContent=DEAD_END_MSG;chip.classList.add("show");
+  }
+}
+
+class AudioBus {
+  constructor(){
+    this.context=null;this.buffers=new Map();this.voices=Array.from({length:4},()=>({source:null,gain:null}));
+    this.cursor=0;this.warned=new Set();this.ready=false;
+  }
+  contextOrNull(){
+    if(this.context)return this.context;
+    const Context=window.AudioContext||window.webkitAudioContext;
+    if(!Context)return null;
+    this.context=new Context();return this.context;
+  }
+  async preload(){
+    const context=this.contextOrNull();if(!context||!audioEvents)return;
+    await Promise.all(audioEvents.events.map(async(event)=>{
+      try{
+        const source=INLINE_AUDIO?.[event.id]||`./audio/${event.file}`;
+        const bytes=await fetch(source).then((response)=>response.arrayBuffer());
+        this.buffers.set(event.id,await context.decodeAudioData(bytes));
+      }catch(error){this.warnOnce(event.id,error)}
+    }));
+    this.ready=this.buffers.size===audioEvents.events.length;
+  }
+  unlock(){const context=this.contextOrNull();if(context?.state==="suspended")void context.resume()}
+  play(id){
+    const context=this.contextOrNull(),buffer=this.buffers.get(id);
+    if(!context||!buffer){this.warnOnce(id,new Error("audio not decoded"));return}
+    const config=audioEvents.events.find((event)=>event.id===id);
+    const voice=this.voices[this.cursor++%this.voices.length];
+    try{voice.source?.stop()}catch{}
+    const source=context.createBufferSource(),gain=context.createGain();
+    gain.gain.value=config.runtime_gain;source.buffer=buffer;source.connect(gain);gain.connect(context.destination);
+    voice.source=source;voice.gain=gain;source.start();
+  }
+  warnOnce(id,error){
+    if(this.warned.has(id))return;
+    this.warned.add(id);console.warn(`OPEN LANE audio ${id}: ${error.message}`);
+  }
+  status(){return{decoded:[...this.buffers.keys()].sort(),voices:this.voices.length,ready:this.ready}}
+}
+const audioBus=new AudioBus();
+
+function pointKey(x,y){return `${x},${y}`}
+function footprint(block,at=block.at){return block.cells.map(([dx,dy])=>[at[0]+dx,at[1]+dy])}
+function occupiedAt(x,y,exceptId=null){
+  if(state.walls.some(([wx,wy])=>wx===x&&wy===y)) return true;
+  return state.blocks.some((block)=>block.id!==exceptId&&footprint(block).some(([bx,by])=>bx===x&&by===y));
+}
+function cellFromEvent(event){
+  const rect=board.getBoundingClientRect();
+  const cell=parseFloat(getComputedStyle(document.documentElement).getPropertyValue("--cell"));
+  return [Math.floor((event.clientX-rect.left)/cell),Math.floor((event.clientY-rect.top)/cell)];
+}
+function position(element,x,y){
+  if(element.classList.contains("block"))element.style.translate=`calc(${x} * var(--cell)) calc(${y} * var(--cell))`;
+  else element.style.transform=`translate3d(calc(${x} * var(--cell)),calc(${y} * var(--cell)),0)`;
+}
+function colorOf(gate){return `var(--${gate.color})`}
+function installArt(){
+  const art=INLINE_ART||DEV_ART;
+  for(const [id,source] of Object.entries(art))document.documentElement.style.setProperty(`--art-${id}`,`url("${source}")`);
+  return art;
+}
+
+function render(){
+  const priorChip=board.querySelector("#chip");
+  board.replaceChildren(priorChip);board.classList.remove("clear-bloom");
+  board.style.setProperty("--cols",state.level.grid.w);
+  board.style.setProperty("--rows",state.level.grid.h);
+  const cell=Math.max(40,Math.min(72,Math.floor((Math.min(innerWidth,430)-48)/state.level.grid.w),Math.floor((innerHeight-220)/state.level.grid.h)));
+  document.documentElement.style.setProperty("--cell",`${cell}px`);
+
+  for(let y=0;y<state.level.grid.h;y++)for(let x=0;x<state.level.grid.w;x++){
+    const tile=document.createElement("div");tile.className=`grid-cell tile-${(x+y)%2?"b":"a"}`;position(tile,x,y);board.append(tile);
+  }
+  for(const [x,y] of state.walls){
+    const wall=document.createElement("div");wall.className="wall";position(wall,x,y);board.append(wall);
+  }
+  const occupied=new Set(state.blocks.flatMap((block)=>footprint(block).map(([x,y])=>pointKey(x,y))));
+  for(const gate of state.level.gates){
+    if(gate.echo&&!state.gateFired[gate.id])for(const [x,y] of gate.echo.cells){
+      const ghost=document.createElement("div");
+      ghost.className=`echo-ghost ${gate.color} ${gate.echo.type.toLowerCase()}${occupied.has(pointKey(x,y))?" skipped":""}`;
+      position(ghost,x,y);board.append(ghost);
+    }
+    const edge=document.createElement("div");
+    edge.className=`gate ${gate.color}`;
+    edge.dataset.gateId=gate.id;edge.dataset.side=gate.side;edge.style.color=colorOf(gate);edge.textContent=SYMBOL[OL.COLOR_SYMBOL[gate.color]];
+    if(gate.side==="N"||gate.side==="S"){
+      edge.style.left=`calc(${gate.span[0]} * var(--cell))`;edge.style.width=`calc(${gate.span[1]} * var(--cell))`;
+    }else{
+      edge.style.top=`calc(${gate.span[0]} * var(--cell))`;edge.style.height=`calc(${gate.span[1]} * var(--cell))`;
+    }
+    board.append(edge);
+  }
+  for(const block of state.blocks){
+    const root=document.createElement("div");root.className="block";root.dataset.blockId=block.id;position(root,block.at[0],block.at[1]);
+    for(const [dx,dy] of block.cells){
+      const cellEl=document.createElement("div");cellEl.className=`block-cell ${block.color}`;
+      cellEl.style.transform=`translate(calc(${dx} * var(--cell)),calc(${dy} * var(--cell)))`;
+      cellEl.textContent=SYMBOL[block.symbol];root.append(cellEl);
+    }
+    root.addEventListener("pointerdown",startDrag);board.append(root);
+  }
+  const clear=OL.isClear(state);
+  status.textContent=clear?"Lane clear. Try the next board.":"Drag a shape to the same symbol at the edge.";
+  status.className=clear?"win":"";
+  phase=clear?"win":"play";
+  undoButton.disabled=state.history.length===0;
+  tabs.replaceChildren(...Object.keys(levels).sort().map((id)=>{
+    const button=document.createElement("button");button.textContent=id;button.dataset.level=id;button.setAttribute("aria-current",id===levelId);
+    button.addEventListener("click",()=>load(id));return button;
+  }));
+}
+
+function startDrag(event){
+  if(phase!=="play")return;
+  const id=event.currentTarget.dataset.blockId;
+  const block=state.blocks.find((candidate)=>candidate.id===id);
+  if(!block)return;
+  const pointer=cellFromEvent(event);
+  drag={id,element:event.currentTarget,grab:[pointer[0]-block.at[0],pointer[1]-block.at[1]]};
+  audioBus.unlock();audioBus.play("grab_tick");
+  drag.element.setPointerCapture(event.pointerId);drag.element.classList.add("grabbed");
+  drag.element.addEventListener("pointermove",moveDrag);drag.element.addEventListener("pointerup",endDrag,{once:true});
+  drag.element.addEventListener("pointercancel",endDrag,{once:true});phase="drag";
+}
+
+function moveDrag(event){
+  if(!drag)return;
+  const pointer=cellFromEvent(event);
+  state=OL.applyDrag(state,drag.id,[pointer[0]-drag.grab[0],pointer[1]-drag.grab[1]]);
+  const block=state.blocks.find((candidate)=>candidate.id===drag.id);
+  position(drag.element,block.at[0],block.at[1]);
+}
+
+function gateDelta(gate,element){
+  const rect=element.getBoundingClientRect(),cell=parseFloat(getComputedStyle(document.documentElement).getPropertyValue("--cell"));
+  if(gate.side==="N")return[0,-rect.height-8-cell];
+  if(gate.side==="S")return[0,rect.height+8+cell];
+  if(gate.side==="W")return[-rect.width-8-cell,0];
+  return[rect.width+8+cell,0];
+}
+
+function animateEcho(echo){
+  if(!echo)return;
+  for(const [x,y] of echo.cells){
+    const fx=document.createElement("div");fx.className=`echo-fx ${echo.type.toLowerCase()}`;
+    position(fx,x,y);board.append(fx);
+    const retract=echo.type==="RETRACT";
+    fx.animate(
+      retract
+        ?[{transform:"scale(1)",opacity:1},{transform:"scale(.82)",opacity:0}]
+        :[{transform:"scale(.82)",opacity:0},{transform:"scale(1)",opacity:1}],
+      {duration:timing.beats[5].duration_ms,easing:timing.easeOutCubic,fill:"forwards"}
+    ).finished.finally(()=>fx.remove());
+  }
+}
+
+function commitExitChain(id,gateId,element){
+  const gate=state.level.gates.find((candidate)=>candidate.id===gateId);
+  const reduced=matchMedia("(prefers-reduced-motion: reduce)").matches;
+  const chainMs=reduced?Math.min(50,timing.beats[6].reduced_motion_input_reenable_max_ms):timing.beats[6].duration_ms;
+  const echoAt=reduced?0:timing.beats[5].start_ms;
+  const [dx,dy]=gateDelta(gate,element);
+  phase="exit";lastChain={gateId,startedAt:performance.now(),inputReenabledAt:null,reduced};
+  audioBus.play("exit_whoosh");
+  if(!reduced){
+    element.animate(
+      [{transform:"translate(0,0) scale(1.04)",opacity:1},{transform:`translate(${dx}px,${dy}px) scale(1.04)`,opacity:.9}],
+      {duration:timing.beats[3].duration_ms,easing:timing.easeOutCubic,fill:"forwards"}
+    );
+    const gateElement=board.querySelector(`[data-gate-id="${gateId}"]`);
+    gateElement?.animate(
+      [{transform:"scale(1)",opacity:1},{transform:"scale(1.12)",opacity:1,offset:64/200},{transform:"scale(1)",opacity:1}],
+      {duration:timing.beats[4].duration_ms,easing:timing.easeOutCubic}
+    );
+  }
+  setTimeout(()=>{
+    state=OL.applyExit(state,id,gateId).state;
+    if(gate.echo)audioBus.play("echo_thunk");
+    render();phase="echo";
+    if(!reduced)animateEcho(gate.echo);
+    if(OL.isClear(state)){board.classList.add("clear-bloom");status.classList.add("chain-win")}
+  },echoAt);
+  setTimeout(()=>{
+    phase=OL.isClear(state)?"win":"play";
+    lastChain.inputReenabledAt=performance.now();
+    if(phase==="play")checkDeadEnd();
+  },chainMs);
+}
+
+function endDrag(){
+  if(!drag)return;
+  const id=drag.id;drag.element.classList.remove("grabbed");drag.element.removeEventListener("pointermove",moveDrag);
+  const gateId=OL.canExit(state,id);
+  if(gateId)commitExitChain(id,gateId,drag.element);
+  else state={...state,lastAction:null};
+  drag=null;
+  if(!gateId){phase="play";render()}
+}
+
+function load(id){
+  if(!levels[id])return;
+  levelId=id;sourceLevel=structuredClone(levels[id]);state=OL.loadLevel(sourceLevel);chip.className="";render();
+}
+
+function debugExit(gateId){
+  for(const block of state.blocks){
+    if(OL.canExit(state,block.id)===gateId){state=OL.applyExit(state,block.id,gateId).state;render();return true}
+  }
+  return false;
+}
+
+async function boot(){
+  const art=installArt();
+  await Promise.all(Object.values(art).map((source)=>new Promise((resolve,reject)=>{const image=new Image();image.onload=resolve;image.onerror=reject;image.src=source})));
+  if(!timing)timing=await fetch("../../game/design/motion/issue_158_open_lane/timing.json",{cache:"no-store"}).then((response)=>response.json());
+  if(!audioEvents)audioEvents=await fetch("../../game/design/motion/issue_158_open_lane/event_map.json",{cache:"no-store"}).then((response)=>response.json());
+  document.documentElement.style.setProperty("--ease-out-cubic",timing.easeOutCubic);
+  void audioBus.preload();
+  if(INLINE_LEVELS) levels=INLINE_LEVELS;
+  else for(const id of LEVEL_IDS)try{
+    const response=await fetch(`./levels/${id}.json`,{cache:"no-store"});
+    if(response.ok)levels[id]=await response.json();
+  }catch{}
+  if(!levels.L1)throw new Error("L1 unavailable");
+  load(new URLSearchParams(location.search).get("level") in levels?new URLSearchParams(location.search).get("level"):"L1");
+}
+
+undoButton.addEventListener("click",()=>{if(phase==="play"||phase==="win"){state=OL.undo(state);chip.classList.remove("show");render()}});
+restartButton.addEventListener("click",()=>{if(phase==="play"||phase==="win")load(levelId)});
+addEventListener("resize",()=>state&&render());
+
+window.olDebug={
+  level:()=>levelId,
+  phase:()=>phase,
+  result:()=>OL.isClear(state)?"clear":null,
+  blocksLeft:()=>state.blocks.length,
+  gates:()=>structuredClone(state.level.gates),
+  legalExits:()=>state.blocks.map((block)=>({blockId:block.id,gateId:OL.canExit(state,block.id)})).filter((entry)=>entry.gateId),
+  applyExit:debugExit,
+  snapshot:()=>OL.snapshot(state),
+  timing:()=>structuredClone(timing),
+  audio:()=>audioBus.status(),
+  lastChain:()=>lastChain?structuredClone(lastChain):null
+  ,art:()=>({source:"CANVAS R2 signal-yard",count:Object.keys(INLINE_ART||DEV_ART).length})
+};
+
+boot().catch((error)=>{phase="error";status.textContent=`Build error: ${error.message}`});
+</script>
+</body>
+</html>

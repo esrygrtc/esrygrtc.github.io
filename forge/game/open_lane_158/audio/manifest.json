@@ -1,0 +1,23 @@
+{
+  "schema": "forge.open-lane-audio-manifest.v1",
+  "events": {
+    "grab_tick": {
+      "file": "grab_tick.mp3",
+      "sha256": "90c950153835d5a65014cb586da1a22f48bb8e7b41c0c0181916acd7b38f47cf",
+      "duration_ms": 80,
+      "bytes": 1925
+    },
+    "exit_whoosh": {
+      "file": "exit_whoosh.mp3",
+      "sha256": "9b944797470a4ac55af4286160bf5b646fe940d531965b39cfbc71331ef97d8e",
+      "duration_ms": 180,
+      "bytes": 2866
+    },
+    "echo_thunk": {
+      "file": "echo_thunk.mp3",
+      "sha256": "de85f1502d4eea0a5ecc57ccb7fe4b8f5b47b2d3ac313d11ea38000c98715675",
+      "duration_ms": 160,
+      "bytes": 2866
+    }
+  }
+}

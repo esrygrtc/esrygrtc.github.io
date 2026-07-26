@@ -1,0 +1,130 @@
+{
+  "id": "L2",
+  "grid": {
+    "w": 6,
+    "h": 6
+  },
+  "walls": [
+    [
+      0,
+      3
+    ],
+    [
+      1,
+      3
+    ],
+    [
+      2,
+      3
+    ],
+    [
+      3,
+      3
+    ],
+    [
+      4,
+      3
+    ],
+    [
+      5,
+      3
+    ]
+  ],
+  "blocks": [
+    {
+      "id": "b1",
+      "color": "amber",
+      "symbol": "circle",
+      "cells": [
+        [
+          0,
+          0
+        ],
+        [
+          1,
+          0
+        ]
+      ],
+      "at": [
+        0,
+        0
+      ]
+    },
+    {
+      "id": "b2",
+      "color": "teal",
+      "symbol": "triangle",
+      "cells": [
+        [
+          0,
+          0
+        ]
+      ],
+      "at": [
+        4,
+        1
+      ]
+    },
+    {
+      "id": "b3",
+      "color": "violet",
+      "symbol": "square",
+      "cells": [
+        [
+          0,
+          0
+        ]
+      ],
+      "at": [
+        4,
+        5
+      ]
+    }
+  ],
+  "gates": [
+    {
+      "id": "g1",
+      "side": "W",
+      "span": [
+        0,
+        2
+      ],
+      "color": "amber",
+      "echo": {
+        "type": "RETRACT",
+        "cells": [
+          [
+            2,
+            3
+          ],
+          [
+            3,
+            3
+          ]
+        ]
+      }
+    },
+    {
+      "id": "g2",
+      "side": "E",
+      "span": [
+        0,
+        2
+      ],
+      "color": "teal",
+      "echo": null
+    },
+    {
+      "id": "g3",
+      "side": "N",
+      "span": [
+        2,
+        2
+      ],
+      "color": "violet",
+      "echo": null
+    }
+  ],
+  "par": 3,
+  "teaches": "gate echo changes the board \u2014 a gate can open a path"
+}

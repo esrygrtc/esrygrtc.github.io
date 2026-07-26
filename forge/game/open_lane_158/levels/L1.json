@@ -1,0 +1,79 @@
+{
+  "id": "L1",
+  "grid": {
+    "w": 5,
+    "h": 5
+  },
+  "walls": [],
+  "blocks": [
+    {
+      "id": "b1",
+      "color": "amber",
+      "symbol": "circle",
+      "cells": [
+        [
+          0,
+          0
+        ]
+      ],
+      "at": [
+        0,
+        2
+      ]
+    },
+    {
+      "id": "b2",
+      "color": "teal",
+      "symbol": "triangle",
+      "cells": [
+        [
+          0,
+          0
+        ]
+      ],
+      "at": [
+        3,
+        3
+      ]
+    },
+    {
+      "id": "b3",
+      "color": "amber",
+      "symbol": "circle",
+      "cells": [
+        [
+          0,
+          0
+        ]
+      ],
+      "at": [
+        1,
+        0
+      ]
+    }
+  ],
+  "gates": [
+    {
+      "id": "g1",
+      "side": "N",
+      "span": [
+        1,
+        1
+      ],
+      "color": "amber",
+      "echo": null
+    },
+    {
+      "id": "g2",
+      "side": "S",
+      "span": [
+        3,
+        1
+      ],
+      "color": "teal",
+      "echo": null
+    }
+  ],
+  "par": 3,
+  "teaches": "colour matching + slide-and-release"
+}

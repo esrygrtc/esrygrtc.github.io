@@ -1,0 +1,18 @@
+{
+  "id": "L3",
+  "grid": { "w": 5, "h": 5 },
+  "walls": [[0, 2], [1, 2], [3, 2], [4, 2], [2, 3]],
+  "blocks": [
+    { "id": "b1", "color": "amber", "symbol": "circle", "cells": [[0, 0], [1, 0]], "at": [0, 0] },
+    { "id": "b2", "color": "teal", "symbol": "triangle", "cells": [[0, 0], [0, 1]], "at": [4, 0] },
+    { "id": "b3", "color": "violet", "symbol": "square", "cells": [[0, 0]], "at": [2, 4] },
+    { "id": "b4", "color": "amber", "symbol": "circle", "cells": [[0, 0]], "at": [3, 1] }
+  ],
+  "gates": [
+    { "id": "gA", "side": "N", "span": [0, 2], "color": "amber", "echo": { "type": "EXTEND", "cells": [[2, 2]] } },
+    { "id": "gT", "side": "E", "span": [0, 2], "color": "teal", "echo": { "type": "RETRACT", "cells": [[2, 3]] } },
+    { "id": "gV", "side": "N", "span": [2, 1], "color": "violet", "echo": null }
+  ],
+  "par": 4,
+  "teaches": "order matters — the teal exit opens the only way up, and the amber exit seals it again"
+}
