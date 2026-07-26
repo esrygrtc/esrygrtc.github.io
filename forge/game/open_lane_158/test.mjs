@@ -150,7 +150,11 @@ const timingById = Object.fromEntries(timing.beats.map((beat) => [beat.id, beat]
 assert.equal(Object.keys(timingById).length, timing.beats.length, "PULSE timing row IDs are unique");
 assert.equal(timing.easeOutCubic, "cubic-bezier(0.33, 1, 0.68, 1)");
 assert.equal(timingById.boot_to_actionable.boot_to_actionable_max_ms, 300, "PLAY→board actionable ceiling is 300 ms");
-assert.equal(timingById.boot_to_actionable.clock_start, "accepted PLAY pointerdown", "boot budget starts on accepted PLAY");
+assert.equal(timingById.boot_to_actionable.clock_start, "accepted PLAY pointerdown", "entry budget starts on accepted PLAY");
+assert.equal(timingById.boot_to_actionable.code_segment_max_ms, 100, "DCL→PLAY-tappable ceiling is 100 ms");
+assert.equal(timingById.boot_to_actionable.code_segment_start, "PerformanceNavigationTiming.domContentLoadedEventEnd", "code segment starts at DCL");
+assert.match(timingById.boot_to_actionable.network_segment, /REPORTED_NOT_GATED/, "the navigation term is reported, never gated");
+assert.match(timingById.boot_to_actionable.audio_contract, /ready === true/, "audio must be decoded before the board is actionable");
 assert.equal(timingById.exit_echo_playable.duration_ms, 540, "exit→echo→playable chain is exactly 540 ms");
 assert.ok(html.includes(`const INLINE_TIMING = ${JSON.stringify(timing)};`), "generated playable embeds timing.json verbatim");
 
