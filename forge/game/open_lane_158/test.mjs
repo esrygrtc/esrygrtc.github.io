@@ -135,13 +135,23 @@ const tmpOut = join(tmpDir, "playable.html");
 execFileSync(process.execPath, [fileURLToPath(new URL("./build_inline.mjs", import.meta.url)), "--out", tmpOut], { stdio: "pipe" });
 const rebuilt = readFileSync(tmpOut);
 assert.deepEqual(rebuilt, shipped, "inline builder reproduces playable byte-for-byte");
-assert.ok(rebuilt.length <= 250 * 1024, "playable stays under 250 KB");
+assert.ok(rebuilt.length <= 420_000, "playable stays under 420 KB (#160 art ceiling)");
 const html = rebuilt.toString("utf8");
 assert.equal(/(?:src|href)=["'](?!data:|#)/.test(html), false, "playable has no external references");
 assert.equal(/\b(timer|lives|ads?|purchase)\b/i.test(html), false, "P1 recovery-pressure surfaces are absent");
-assert.equal((html.match(/data:image\/webp;base64,/g) || []).length, 10, "10 CANVAS R2 runtime art assets are embedded");
+// #160 D-a: count of inlined art assets must match manifest directory
+const manifestJson = JSON.parse(readFileSync(new URL("./art/manifest.json", import.meta.url), "utf8"));
+const expectedArtCount = [...manifestJson.blocks, ...manifestJson.doors, ...manifestJson.settings, ...(manifestJson.shell||[]), ...manifestJson.legacy].length;
+const actualArtCount = (html.match(/data:image\/webp;base64,/g) || []).length;
+assert.equal(actualArtCount, expectedArtCount, `D-a: ${expectedArtCount} art assets from manifest are embedded`);
 assert.ok(html.includes('source:"CANVAS R2 signal-yard"'), "debug surface identifies the real-art lineage");
-assert.ok(html.includes("var(--art-tile-a)") && html.includes("var(--art-amber)"), "board and block visuals use art bytes");
+assert.ok(html.includes("var(--art-tile-a)"), "board tile art is wired");
+// #160 D-d: byte ceiling checked above. D-e: ack invariance
+assert.ok(html.includes(".block.grabbed{scale:1.04"), "D-e: grabbed scale rule survives");
+assert.ok(html.includes(".block.grabbed .block-cell{outline:3px solid #fff}"), "D-e: grabbed outline rule survives");
+// #160: block-skin and door-thickness tokens present
+assert.ok(html.includes("--door-thickness:calc(0.625"), "D: door thickness token scales with cell");
+assert.ok(html.includes("block-skin"), "D: block-skin element class is in the build");
 
 const feelRoot = new URL("../../game/design/motion/issue_158_open_lane/", import.meta.url);
 const timing = JSON.parse(readFileSync(new URL("timing.json", feelRoot), "utf8"));

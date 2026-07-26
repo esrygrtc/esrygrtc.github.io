@@ -1,0 +1,24 @@
+{
+  "blocks": [
+    "block-amber-1x1", "block-amber-1x2", "block-amber-2x1",
+    "block-lime-1x1", "block-lime-1x2", "block-lime-2x1",
+    "block-teal-1x1", "block-teal-1x2", "block-teal-2x1",
+    "block-violet-1x1", "block-violet-1x2", "block-violet-2x1"
+  ],
+  "doors": [
+    "door-amber-1c-horizontal", "door-amber-1c-vertical",
+    "door-amber-2c-horizontal", "door-amber-2c-vertical",
+    "door-amber-3c-horizontal", "door-amber-3c-vertical",
+    "door-lime-1c-horizontal", "door-lime-1c-vertical",
+    "door-lime-2c-horizontal", "door-lime-2c-vertical",
+    "door-lime-3c-horizontal", "door-lime-3c-vertical",
+    "door-teal-1c-horizontal", "door-teal-1c-vertical",
+    "door-teal-2c-horizontal", "door-teal-2c-vertical",
+    "door-teal-3c-horizontal", "door-teal-3c-vertical",
+    "door-violet-1c-horizontal", "door-violet-1c-vertical",
+    "door-violet-2c-horizontal", "door-violet-2c-vertical",
+    "door-violet-3c-horizontal", "door-violet-3c-vertical"
+  ],
+  "settings": ["settings-normal", "settings-pressed", "settings-disabled"],
+  "legacy": ["background", "tile-a", "tile-b", "frame-corner", "frame-h", "frame-v", "amber", "teal", "violet", "lime"]
+}

@@ -19,18 +19,21 @@ const inlineAudio = Object.fromEntries(
     `data:audio/mpeg;base64,${readFileSync(join(root, "audio", event.file)).toString("base64")}`,
   ])
 );
-const artFiles = {
-  background: "background.webp",
-  "tile-a": "tile-a.webp",
-  "tile-b": "tile-b.webp",
-  "frame-corner": "frame-corner.webp",
-  "frame-h": "frame-h.webp",
-  "frame-v": "frame-v.webp",
-  amber: "amber.webp",
-  teal: "teal.webp",
-  violet: "violet.webp",
-  lime: "lime.webp",
-};
+// #160: readdirSync replaces hardcoded map — manifest asserts completeness
+const manifest = JSON.parse(readFileSync(join(artPath, "manifest.json"), "utf8"));
+const manifestSet = new Set([...manifest.blocks, ...manifest.doors, ...manifest.settings, ...manifest.legacy]);
+const dirEntries = readdirSync(artPath).filter((f) => f.endsWith(".webp")).map((f) => f.slice(0, -5)).sort();
+const dirSet = new Set(dirEntries);
+const missingFromDir = [...manifestSet].filter((id) => !dirSet.has(id));
+const missingFromManifest = [...dirSet].filter((id) => !manifestSet.has(id));
+if (missingFromDir.length || missingFromManifest.length) {
+  let msg = "Art manifest mismatch:\n";
+  if (missingFromDir.length) msg += `  Missing from dir: ${missingFromDir.join(", ")}\n`;
+  if (missingFromManifest.length) msg += `  Missing from manifest: ${missingFromManifest.join(", ")}\n`;
+  throw new Error(msg);
+}
+const artFiles = {};
+for (const id of dirEntries) artFiles[id] = `${id}.webp`;
 const inlineArt = Object.fromEntries(
   Object.entries(artFiles).map(([id, file]) => [
     id,
