@@ -859,10 +859,29 @@ function endDrag(){
   if(!gateId){phase="play";render()}
 }
 
+// #161: bind the clear-burst sprite to the board that was cleared.  One pie
+// wedge per distinct block colour, regenerated from state.blocks at every
+// load().  Two levels with different palettes get different art.
+function regenerateClearBurst(){
+  const colours=[...new Set(state.blocks.map((b)=>b.color))];
+  const hex={amber:"#ffb41f",teal:"#23c6c3",violet:"#964bd3",lime:"#f35b57"};
+  const cv=document.createElement("canvas");cv.width=128;cv.height=128;
+  const ctx=cv.getContext("2d");
+  const cx=64,cy=64,r=56;
+  colours.forEach((c,i)=>{
+    const a0=(i/colours.length)*Math.PI*2-Math.PI/2;
+    const a1=((i+1)/colours.length)*Math.PI*2-Math.PI/2;
+    ctx.beginPath();ctx.moveTo(cx,cy);ctx.arc(cx,cy,r,a0,a1);ctx.closePath();
+    ctx.fillStyle=hex[c]||"#fff";ctx.fill();
+  });
+  document.documentElement.style.setProperty("--art-lane-clear-burst",`url("${cv.toDataURL("image/png")}")`);
+}
+
 function load(id){
   if(!levels[id])return;
   cancelClearTimers();clearCelebration();
   levelId=id;sourceLevel=structuredClone(levels[id]);state=OL.loadLevel(sourceLevel);failSoundPlayed=false;chip.className="";render();
+  regenerateClearBurst();
 }
 
 function debugExit(gateId){
