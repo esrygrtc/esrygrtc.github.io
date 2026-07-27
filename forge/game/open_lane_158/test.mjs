@@ -260,4 +260,16 @@ const gateDir = new URL("../../game/design/motion/issue_160_open_lane_refs/", im
 execFileSync(process.execPath, [fileURLToPath(new URL("win_timing_gate.mjs", gateDir))], { stdio: "inherit" });
 execFileSync(process.execPath, [fileURLToPath(new URL("win_timing_gate_can_fail.mjs", gateDir))], { stdio: "inherit" });
 
+// #160 T13 provenance gate. `--check` must be read-only and stand alone:
+// `--write` is an authoring command that would refresh hashes from tampered
+// working-tree bytes before this suite had a chance to reject them.
+execFileSync(
+  process.execPath,
+  [
+    fileURLToPath(new URL("../../docs/art/open_lane/provenance_manifest.mjs", import.meta.url)),
+    "--check",
+  ],
+  { stdio: "inherit" },
+);
+
 process.stdout.write("OPEN LANE S1/S2 PASS — model + schema + deterministic inline playable\n");
