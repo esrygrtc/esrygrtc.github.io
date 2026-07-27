@@ -255,4 +255,9 @@ for (const functionName of ["startDrag", "commitExitChain", "endDrag"]) {
   assert.equal(/\bawait\b/.test(match[0]), false, `${functionName} input path never awaits audio`);
 }
 
+// #160 win-timing gate (PULSE db9979fb) — celebration present + advance ≤1200 ms
+const gateDir = new URL("../../game/design/motion/issue_160_open_lane_refs/", import.meta.url);
+execFileSync(process.execPath, [fileURLToPath(new URL("win_timing_gate.mjs", gateDir))], { stdio: "inherit" });
+execFileSync(process.execPath, [fileURLToPath(new URL("win_timing_gate_can_fail.mjs", gateDir))], { stdio: "inherit" });
+
 process.stdout.write("OPEN LANE S1/S2 PASS — model + schema + deterministic inline playable\n");
