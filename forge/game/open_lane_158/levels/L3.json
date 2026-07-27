@@ -13,6 +13,7 @@
     { "id": "gT", "side": "E", "span": [0, 2], "color": "teal", "echo": { "type": "RETRACT", "cells": [[2, 3]] } },
     { "id": "gV", "side": "N", "span": [2, 1], "color": "violet", "echo": null }
   ],
+  "name": "Crossing",
   "par": 4,
-  "teaches": "order matters — the teal exit opens the only way up, and the amber exit seals it again"
+  "teaches": "Order matters: which exit you open first changes what's possible."
 }

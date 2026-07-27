@@ -74,6 +74,7 @@
       "echo": null
     }
   ],
+  "name": "First Light",
   "par": 3,
-  "teaches": "colour matching + slide-and-release"
+  "teaches": "Slide each shape out through its matching edge."
 }

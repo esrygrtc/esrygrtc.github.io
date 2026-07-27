@@ -125,6 +125,7 @@
       "echo": null
     }
   ],
+  "name": "The Echo",
   "par": 3,
-  "teaches": "gate echo changes the board \u2014 a gate can open a path"
+  "teaches": "Watch the gate: opening it moves the wall."
 }
