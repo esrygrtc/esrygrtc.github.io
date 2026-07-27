@@ -41,8 +41,14 @@ for (const item of audioItems) {
 }
 // #160: readdirSync replaces hardcoded map — manifest asserts completeness
 const manifest = JSON.parse(readFileSync(join(artPath, "manifest.json"), "utf8"));
-const manifestSet = new Set([...manifest.blocks, ...manifest.doors, ...manifest.settings, ...manifest.legacy]);
-const dirEntries = readdirSync(artPath).filter((f) => f.endsWith(".webp")).map((f) => f.slice(0, -5)).sort();
+const manifestSet = new Set([...manifest.blocks, ...manifest.doors, ...manifest.settings, ...manifest.legacy, ...(manifest.t3 || []).map((id) => `t3-${id}`)]);
+// Recursive read: art/ root + art/t3/ subdirectory; keys hyphenated (t3-x not t3/x)
+const rootPairs = readdirSync(artPath).filter((f) => f.endsWith(".webp")).map((f) => [f.slice(0, -5), f]);
+const t3Dir = join(artPath, "t3");
+let t3Pairs = [];
+try { t3Pairs = readdirSync(t3Dir).filter((f) => f.endsWith(".webp")).map((f) => [`t3-${f.slice(0, -5)}`, `t3/${f}`]); } catch {}
+const allPairs = [...rootPairs, ...t3Pairs].sort(([a], [b]) => a.localeCompare(b));
+const dirEntries = allPairs.map(([id]) => id);
 const dirSet = new Set(dirEntries);
 const missingFromDir = [...manifestSet].filter((id) => !dirSet.has(id));
 const missingFromManifest = [...dirSet].filter((id) => !manifestSet.has(id));
@@ -52,8 +58,7 @@ if (missingFromDir.length || missingFromManifest.length) {
   if (missingFromManifest.length) msg += `  Missing from manifest: ${missingFromManifest.join(", ")}\n`;
   throw new Error(msg);
 }
-const artFiles = {};
-for (const id of dirEntries) artFiles[id] = `${id}.webp`;
+const artFiles = Object.fromEntries(allPairs);
 const inlineArt = Object.fromEntries(
   Object.entries(artFiles).map(([id, file]) => [
     id,
