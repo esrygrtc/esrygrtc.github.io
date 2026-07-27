@@ -826,33 +826,30 @@ function startClearCelebration(reduced){
     const halo=document.createElement("div");halo.className="clear-halo";board.appendChild(halo);
     const burst=document.createElement("div");burst.className="clear-burst";board.appendChild(burst);
     const ribbon=document.createElement("div");ribbon.className="clear-ribbon";
-    // #161 F2: moves vs par — points at a skill, not a currency
-    const moves=state.history.length;
-    const par=sourceLevel.par||0;
-    const verdict=moves<par?"under par":moves===par?"on par":"over par";
-    ribbon.textContent=`LEVEL CLEAR · moves ${moves} · par ${par} · ${verdict}`;
+    ribbon.textContent="LEVEL CLEAR";
     board.appendChild(ribbon);
   }
 
-  // Timing: clear 0–720ms · manual continue 360ms · board_clear_to_next_level 720–1200ms
-  const MANUAL=360, RELEASE_END=reduced?420:900, NEXT_ENTER=reduced?480:900, NEXT_ACTIONABLE=reduced?560:1080;
-  let advanced=false;
-  function advance(){
-    if(advanced)return;advanced=true;
+  // #161 W1/W2: the win waits for the player.  No auto-advance — the board
+  // celebrates, then screen-complete slides in holding NEXT and HOME.  The
+  // player chooses when to continue.
+  const BLOOM_END=reduced?500:900;
+  clearTimers.push(setTimeout(()=>{
     cancelClearTimers();clearCelebration();
+    // Put moves/par on the card the player sees
+    const moves=state.history.length;
+    const par=sourceLevel.par||0;
+    const verdict=moves<par?"under par":moves===par?"on par":"over par";
+    const card=document.querySelector("#screen-complete .result-card");
+    card.querySelector("h2").textContent="LEVEL CLEAR";
+    let stat=card.querySelector(".result-stat");
+    if(!stat){stat=document.createElement("p");stat.className="result-stat";card.insertBefore(stat,card.querySelector(".result-btns"))}
+    stat.textContent=`moves ${moves} · par ${par} · ${verdict}`;
+    // NEXT button label reflects whether another level exists
     const idx=LEVEL_IDS.indexOf(levelId);
-    const nextId=idx>=0&&idx<LEVEL_IDS.length-1?LEVEL_IDS[idx+1]:null;
-    if(nextId&&levels[nextId]){load(nextId);showScreen("game")}
-    else showScreen("menu");
-  }
-  // Tap-to-continue after 360ms (manual continue actionable)
-  function tapContinue(e){if(performance.now()-celebrationStart<MANUAL)return;e.preventDefault();advance()}
-  const celebrationStart=performance.now();
-  board.addEventListener("pointerdown",tapContinue,{once:true});
-  clearTimers.push(setTimeout(()=>board.removeEventListener("pointerdown",tapContinue),NEXT_ENTER));
-
-  // Celebration release → auto-advance
-  clearTimers.push(setTimeout(advance,NEXT_ENTER));
+    nextBtn.textContent=idx<LEVEL_IDS.length-1?"NEXT":"DONE";
+    showScreen("complete");
+  },BLOOM_END));
 }
 
 function endDrag(){

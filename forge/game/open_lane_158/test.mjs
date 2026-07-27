@@ -150,7 +150,7 @@ const codeOnly = html.replace(/data:(?:image|audio)\/[a-z+]+;base64,[A-Za-z0-9+/
 assert.equal(/\b(timer|lives|ads?|purchase)\b/i.test(codeOnly), false, "P1 recovery-pressure surfaces are absent");
 // #160 D-a: count of inlined art assets must match manifest directory
 const manifestJson = JSON.parse(readFileSync(new URL("./art/manifest.json", import.meta.url), "utf8"));
-const expectedArtCount = [...manifestJson.blocks, ...manifestJson.doors, ...manifestJson.settings, ...(manifestJson.shell||[]), ...manifestJson.legacy].length;
+const expectedArtCount = [...manifestJson.blocks, ...manifestJson.doors, ...manifestJson.settings, ...(manifestJson.shell||[]), ...manifestJson.legacy, ...(manifestJson.t3||[])].length;
 const actualArtCount = (html.match(/data:image\/webp;base64,/g) || []).length;
 assert.equal(actualArtCount, expectedArtCount, `D-a: ${expectedArtCount} art assets from manifest are embedded`);
 assert.ok(html.includes('source:"CANVAS R2 signal-yard"'), "debug surface identifies the real-art lineage");
@@ -269,6 +269,14 @@ execFileSync(
     fileURLToPath(new URL("../../docs/art/open_lane/provenance_manifest.mjs", import.meta.url)),
     "--check",
   ],
+  { stdio: "inherit" },
+);
+
+// #161 build provenance gate — source and shipped build must not diverge.
+// Reds if index/levels/model change without rebuilding playable.html.
+execFileSync(
+  process.execPath,
+  [fileURLToPath(new URL("../../tools/build_provenance_gate.mjs", import.meta.url)), "--rev", "HEAD"],
   { stdio: "inherit" },
 );
 
