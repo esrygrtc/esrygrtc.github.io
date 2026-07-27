@@ -20,6 +20,6 @@
     "door-violet-3c-horizontal", "door-violet-3c-vertical"
   ],
   "settings": ["settings-normal", "settings-pressed", "settings-disabled"],
-  "legacy": ["background", "tile-a", "tile-b", "frame-corner", "frame-h", "frame-v", "amber", "teal", "violet", "lime", "title-bg", "title-bg-v2", "lane-clear-burst"],
+  "legacy": ["background", "tile-a", "tile-b", "frame-corner", "frame-h", "frame-v", "title-bg-v2", "lane-clear-burst"],
   "t3": ["ribbon-fail", "ribbon-clear", "card-cream", "ticket-cream", "button-red-normal", "button-red-pressed", "button-teal-normal", "button-teal-pressed", "button-cream-normal", "button-cream-pressed", "pipe-tile-seamless"]
 }
