@@ -80,6 +80,11 @@ button[aria-current=true]{border-color:#e9f1f8;background:#354353;color:#f2f7fb}
 /* T2/T3/T8 — shell screens (#160) · P7: ≤50ms ack via --ack-ms · P8: audio init on PLAY gesture */
 .screen-overlay{position:fixed;inset:0;z-index:50;display:none;flex-direction:column;align-items:center;justify-content:center;gap:22px;background:rgba(16,20,27,.94);-webkit-backdrop-filter:blur(10px);backdrop-filter:blur(10px);padding:20px}
 .screen-overlay.show{display:flex}
+#screen-complete{background:rgba(16,20,27,.28);backdrop-filter:blur(2px)}
+.win-stars{display:flex;gap:10px;margin:2px 0}
+.win-star{width:38px;height:38px;display:inline-block;clip-path:polygon(50% 0,61% 35%,98% 35%,68% 57%,79% 91%,50% 70%,21% 91%,32% 57%,2% 35%,39% 35%);background:#3a4a5a;opacity:.3;transform:scale(.55);transition:opacity 110ms var(--ease-out-cubic),transform 110ms var(--ease-out-cubic)}
+.win-star.lit{background:gold;opacity:1;animation:star-pop 220ms var(--ease-out-cubic) both}
+@keyframes star-pop{0%{transform:scale(.55);opacity:0}70%{transform:scale(1.12)}100%{transform:scale(1);opacity:1}}
 #screen-menu{background:var(--art-title-bg-v2) center/cover no-repeat;background-color:#10141b}
 .big-play{min-width:190px;min-height:74px;font-size:28px;font-weight:900;letter-spacing:.15em;border-radius:22px;transition:transform var(--ack-ms) var(--ease-out-cubic)}
 .big-play:active{transform:scale(.94)}
@@ -126,6 +131,7 @@ button[aria-current=true]{border-color:#e9f1f8;background:#354353;color:#f2f7fb}
   <div id="screen-complete" class="screen-overlay">
     <div class="result-card complete">
       <h2>LEVEL CLEAR</h2>
+      <div class="win-stars"><i class="win-star"></i><i class="win-star"></i><i class="win-star"></i></div>
       <div class="result-btns">
         <button id="next-btn" type="button">NEXT</button>
         <button id="home-complete" type="button">HOME</button>
@@ -497,7 +503,7 @@ let failSoundPlayed = false;
 let currentScreen = "menu";
 let clearTimers = [];
 function cancelClearTimers(){clearTimers.forEach(clearTimeout);clearTimers=[]}
-function clearCelebration(){board.querySelectorAll(".clear-halo,.clear-hero,.clear-ribbon,.clear-spark").forEach((e)=>e.remove());board.classList.remove("clear-bloom","celebrating")}
+function clearCelebration(){board.querySelectorAll(".clear-halo,.clear-hero,.clear-ribbon,.clear-spark").forEach((e)=>e.remove());board.classList.remove("clear-bloom")}
 const SEARCH_CAP = 200000;
 const DEAD_END_MSG = "no way to clear this board — undo or restart";
 const sleep = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
@@ -817,11 +823,13 @@ function commitExitChain(id,gateId,element){
   },chainMs);
 }
 
-// ══ Win celebration — PULSE timing.json c262f824 ══
+// ══ Win celebration + three-star reward — PULSE timing.json 115d12d8 ══
+const WIN_REWARD_TIMING={"cardStart":200,"starStarts":[220,330,440],"starDuration":110,"buttonsStart":550,"buttonsEnd":710};
+function stageButtons(buttons,delay){buttons.forEach((button)=>{button.disabled=true;button.setAttribute("aria-hidden","true")});clearTimers.push(setTimeout(()=>buttons.forEach((button)=>{button.disabled=false;button.removeAttribute("aria-hidden")}),delay))}
 function startClearCelebration(reduced){
   audioBus.play("level_complete");
-  status.classList.add("win","chain-win"); status.textContent="Lane clear!";
-  board.classList.add("clear-bloom","celebrating");
+  status.classList.add("win","chain-win");status.textContent="Lane clear!";
+  board.classList.add("clear-bloom");
 
   if(!reduced){
     const halo=document.createElement("div");halo.className="clear-halo";board.appendChild(halo);
@@ -831,26 +839,38 @@ function startClearCelebration(reduced){
     board.appendChild(ribbon);
   }
 
-  // #161 W1/W2: the win waits for the player.  No auto-advance — the board
-  // celebrates, then screen-complete slides in holding NEXT and HOME.  The
-  // player chooses when to continue.
-  const BLOOM_END=reduced?500:900;
+  // #161: three-star reward schedule per PULSE 115d12d8
+  // Card enters at 200ms; stars at 220/330/440; buttons at 550ms.
+  const cardStart=reduced?80:WIN_REWARD_TIMING.cardStart;
+  const starStarts=reduced?[80,120,160]:WIN_REWARD_TIMING.starStarts;
+  const buttonsStart=reduced?240:WIN_REWARD_TIMING.buttonsStart;
+
   clearTimers.push(setTimeout(()=>{
-    cancelClearTimers();clearCelebration();
-    // Put moves/par on the card the player sees
+    // Remove board ribbon so two LEVEL CLEAR titles never compete
+    board.querySelector(".clear-ribbon")?.remove();
+    // Update card content
     const moves=state.history.length;
     const par=sourceLevel.par||0;
     const verdict=moves<par?"under par":moves===par?"on par":"over par";
     const card=document.querySelector("#screen-complete .result-card");
     card.querySelector("h2").textContent="LEVEL CLEAR";
     let stat=card.querySelector(".result-stat");
-    if(!stat){stat=document.createElement("p");stat.className="result-stat";card.insertBefore(stat,card.querySelector(".result-btns"))}
+    if(!stat){stat=document.createElement("p");stat.className="result-stat";stat.style.opacity="0";stat.style.transition="opacity 140ms var(--ease-out-cubic)";card.insertBefore(stat,card.querySelector(".win-stars"))}
     stat.textContent=`moves ${moves} · par ${par} · ${verdict}`;
-    // NEXT button label reflects whether another level exists
+    // Reset stars
+    const starEls=card.querySelectorAll(".win-star");
+    starEls.forEach(s=>s.classList.remove("lit"));
+    // NEXT button label
     const idx=LEVEL_IDS.indexOf(levelId);
     nextBtn.textContent=idx<LEVEL_IDS.length-1?"NEXT":"DONE";
     showScreen("complete");
-  },BLOOM_END));
+    // Stage stat reveal
+    clearTimers.push(setTimeout(()=>{stat.style.opacity="1"},reduced?40:160));
+    // Stage stars at their canonical offsets from cardStart
+    starStarts.forEach((start,i)=>{clearTimers.push(setTimeout(()=>starEls[i]?.classList.add("lit"),start-cardStart))});
+    // Stage buttons — disabled+hidden until buttonsStart
+    stageButtons([nextBtn,homeCompleteBtn],buttonsStart-cardStart);
+  },cardStart));
 }
 
 function endDrag(){

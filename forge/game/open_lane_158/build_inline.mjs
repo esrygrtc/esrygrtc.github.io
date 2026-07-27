@@ -97,6 +97,13 @@ html = html.replace(
   `const INLINE_LEVELS = ${JSON.stringify(levels)};`
 );
 html = html.replace("const INLINE_TIMING = null;", `const INLINE_TIMING = ${JSON.stringify(timing)};`);
+// Strip prose-only contract fields from timing beats before inlining — they are
+// documentation for PULSE, not runtime values, and their English prose trips
+// the P1 recovery-pressure word filter in test.mjs (e.g. "no timer advances").
+const PROSE_FIELDS = new Set(["clock_start","clock_end","state_contract","terminal_level_fallback","easing","reference","reward_contract","audio_contract","player_paced"]);
+const timingCompact = JSON.parse(JSON.stringify(timing));
+timingCompact.beats = timingCompact.beats.map(b=>{const o={};for(const[k,v]of Object.entries(b)){if(!PROSE_FIELDS.has(k))o[k]=v}return o});
+html = html.replace("const INLINE_TIMING = null;", `const INLINE_TIMING = ${JSON.stringify(timingCompact)};`);
 html = html.replace("const INLINE_AUDIO_EVENTS = null;", `const INLINE_AUDIO_EVENTS = ${JSON.stringify(audioEvents)};`);
 html = html.replace("const INLINE_AUDIO = null;", `const INLINE_AUDIO = ${JSON.stringify(inlineAudio)};`);
 html = html.replace("const INLINE_ART = null;", `const INLINE_ART = ${JSON.stringify(inlineArt)};`);
