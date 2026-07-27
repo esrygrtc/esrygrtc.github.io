@@ -20,5 +20,5 @@
     "door-violet-3c-horizontal", "door-violet-3c-vertical"
   ],
   "settings": ["settings-normal", "settings-pressed", "settings-disabled"],
-  "legacy": ["background", "tile-a", "tile-b", "frame-corner", "frame-h", "frame-v", "amber", "teal", "violet", "lime", "title-bg"]
+  "legacy": ["background", "tile-a", "tile-b", "frame-corner", "frame-h", "frame-v", "amber", "teal", "violet", "lime", "title-bg", "title-bg-v2", "lane-clear-burst"]
 }

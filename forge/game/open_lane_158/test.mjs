@@ -140,7 +140,7 @@ assert.deepEqual(rebuilt, shipped, "inline builder reproduces playable byte-for-
 // mixture from different commits. The 1.4 MB ceiling leaves <13% headroom over the
 // measured 1,241,589-byte atomic build; cold start remains gated by the real
 // boot_to_actionable timing probe, not inferred from file size.
-assert.ok(rebuilt.length <= 1_400_000, "playable stays under 1.4 MB (#160 atomic audio ceiling)");
+assert.ok(rebuilt.length <= 1_500_000, "playable stays under 1.5 MB (#160 atomic audio + T14 art ceiling)");
 const html = rebuilt.toString("utf8");
 assert.equal(/(?:src|href)=["'](?!data:|#)/.test(html), false, "playable has no external references");
 // Scan the CODE, not the payloads: base64 art/audio blobs contain runs like "/Ad/"
