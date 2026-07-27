@@ -6,7 +6,7 @@
 <meta name="theme-color" content="#10141b">
 <title>OPEN LANE — P1 Greybox</title>
 <style>
-:root{color-scheme:dark;--cell:60px;--door-thickness:calc(0.625 * var(--cell));--ease-out-cubic:cubic-bezier(0.33,1,0.68,1);--ack-ms:50ms;--amber:#ffb41f;--teal:#23c6c3;--violet:#964bd3;--lime:#f35b57;--art-background:none;--art-tile-a:none;--art-tile-b:none;--art-frame-corner:none;--art-frame-h:none;--art-frame-v:none;--art-amber:none;--art-teal:none;--art-violet:none;--art-lime:none;--art-settings-normal:none;--art-settings-pressed:none;--art-settings-disabled:none;--art-title-bg:none;--art-title-bg-v2:none;--art-lane-clear-burst:none}
+:root{color-scheme:dark;--cell:60px;--door-thickness:calc(0.625 * var(--cell));--ease-out-cubic:cubic-bezier(0.33,1,0.68,1);--ack-ms:50ms;--amber:#ffb41f;--teal:#23c6c3;--violet:#964bd3;--lime:#f35b57;--art-background:none;--art-tile-a:none;--art-tile-b:none;--art-frame-corner:none;--art-frame-h:none;--art-frame-v:none;--art-amber:none;--art-teal:none;--art-violet:none;--art-lime:none;--art-settings-normal:none;--art-settings-pressed:none;--art-settings-disabled:none;--art-title-bg:none;--art-title-bg-v2:none;--art-lane-clear-burst:none;--art-t3-ribbon-fail:none;--art-t3-ribbon-clear:none;--art-t3-card-cream:none;--art-t3-ticket-cream:none;--art-t3-button-red-normal:none;--art-t3-button-red-pressed:none;--art-t3-button-teal-normal:none;--art-t3-button-teal-pressed:none;--art-t3-button-cream-normal:none;--art-t3-button-cream-pressed:none;--art-t3-pipe-tile:none}
 *{box-sizing:border-box}
 html,body{margin:0;min-height:100%;overflow:hidden;background:#123f5c var(--art-background) center/cover no-repeat;color:#fff0cc;font-family:ui-rounded,system-ui,sans-serif;touch-action:none}
 body{display:flex;justify-content:center}
@@ -447,7 +447,18 @@ const DEV_ART = Object.freeze({
   "settings-normal":"./art/settings-normal.webp","settings-pressed":"./art/settings-pressed.webp","settings-disabled":"./art/settings-disabled.webp",
   "title-bg":"./art/title-bg.webp",
   "title-bg-v2":"./art/title-bg-v2.webp",
-  "lane-clear-burst":"./art/lane-clear-burst.webp"
+  "lane-clear-burst":"./art/lane-clear-burst.webp",
+  "t3/ribbon-fail":"./art/t3/ribbon-fail.webp",
+  "t3/ribbon-clear":"./art/t3/ribbon-clear.webp",
+  "t3/card-cream":"./art/t3/card-cream.webp",
+  "t3/ticket-cream":"./art/t3/ticket-cream.webp",
+  "t3/button-red-normal":"./art/t3/button-red-normal.webp",
+  "t3/button-red-pressed":"./art/t3/button-red-pressed.webp",
+  "t3/button-teal-normal":"./art/t3/button-teal-normal.webp",
+  "t3/button-teal-pressed":"./art/t3/button-teal-pressed.webp",
+  "t3/button-cream-normal":"./art/t3/button-cream-normal.webp",
+  "t3/button-cream-pressed":"./art/t3/button-cream-pressed.webp",
+  "t3/pipe-tile-seamless":"./art/t3/pipe-tile-seamless.webp"
 });
 
 const SYMBOL = {circle:"●",triangle:"▲",square:"■",cross:"✚"};
