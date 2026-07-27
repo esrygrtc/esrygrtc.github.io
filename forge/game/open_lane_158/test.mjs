@@ -135,14 +135,12 @@ const tmpOut = join(tmpDir, "playable.html");
 execFileSync(process.execPath, [fileURLToPath(new URL("./build_inline.mjs", import.meta.url)), "--out", tmpOut], { stdio: "pipe" });
 const rebuilt = readFileSync(tmpOut);
 assert.deepEqual(rebuilt, shipped, "inline builder reproduces playable byte-for-byte");
-// Single-file preview ceiling. Re-baselined 2026-07-27 (FABLE, #158 perf budget):
-// 420 KB was set while the board was greybox; the owner-accepted R2/R3 art kit is 49
-// webp blobs and pushed the build to 540 KB at 7e485107, which left the whole branch
-// suite RED with no owner. The number this ceiling was really protecting is COLD
-// START, and that is gated for real by timing.json#boot_to_actionable (300 ms) and
-// measured by tools/live_play_probe_openlane.mjs on the deployed URL. P2 must
-// re-derive this from a device cold-start measurement, not from headroom.
-assert.ok(rebuilt.length <= 700_000, "playable stays under 700 KB (P1 preview ceiling)");
+// Single-file preview ceiling. #160 intentionally inlines the sha-bound 480,698-byte
+// music bed plus seven event sounds so the owner URL cannot point at an HTML/audio
+// mixture from different commits. The 1.4 MB ceiling leaves <13% headroom over the
+// measured 1,241,589-byte atomic build; cold start remains gated by the real
+// boot_to_actionable timing probe, not inferred from file size.
+assert.ok(rebuilt.length <= 1_400_000, "playable stays under 1.4 MB (#160 atomic audio ceiling)");
 const html = rebuilt.toString("utf8");
 assert.equal(/(?:src|href)=["'](?!data:|#)/.test(html), false, "playable has no external references");
 // Scan the CODE, not the payloads: base64 art/audio blobs contain runs like "/Ad/"
@@ -208,13 +206,28 @@ assert.doesNotMatch(ackRule[1], /transition/, "the ack rule itself must stay tra
 assert.ok(html.includes(`const INLINE_TIMING = ${JSON.stringify(timing)};`), "generated playable embeds timing.json verbatim");
 
 const manifest = JSON.parse(readFileSync(new URL("./audio/manifest.json", import.meta.url), "utf8"));
-for (const [id, entry] of Object.entries(manifest.events)) {
+assert.equal(manifest.schema, "forge.open-lane-audio-manifest.v2");
+const eventMapBytes = readFileSync(new URL("event_map.json", feelRoot));
+assert.equal(
+  createHash("sha256").update(eventMapBytes).digest("hex"),
+  manifest.event_map_sha256,
+  "audio manifest binds the exact event_map bytes"
+);
+const audioMap = JSON.parse(eventMapBytes);
+const mappedAudio = [...audioMap.events, audioMap.music];
+assert.deepEqual(
+  Object.keys(manifest.assets).sort(),
+  mappedAudio.map((item)=>item.id).sort(),
+  "manifest covers every mapped event and the music bed"
+);
+for (const [id, entry] of Object.entries(manifest.assets)) {
   const bytes = readFileSync(new URL(`./audio/${entry.file}`, import.meta.url));
   const hash = createHash("sha256").update(bytes).digest("hex");
   assert.equal(hash, entry.sha256, `${id} delivery hash`);
+  assert.equal(bytes.length, entry.bytes, `${id} delivery byte count`);
   assert.ok(html.includes(`data:audio/mpeg;base64,${bytes.toString("base64")}`), `${id} is embedded`);
 }
-assert.equal(Object.keys(manifest.events).length, 3, "3/3 audio hashes are bound");
+assert.equal(Object.keys(manifest.assets).length, 8, "8/8 runtime audio hashes are bound");
 
 // AUDIO INPUT CONTRACT (#158, added 2026-07-27 after 9d1deec0 renamed every event id
 // in event_map.json without touching the shell that plays them or moving the bytes).
@@ -223,9 +236,12 @@ assert.equal(Object.keys(manifest.events).length, 3, "3/3 audio hashes are bound
 // level_complete, fail}, the shell kept asking for {grab_tick, exit_whoosh,
 // echo_thunk}, and every gameplay sound would have shipped silent. The build only
 // escaped because it died on a missing file first. Assert the contract, not the file.
-const audioMap = JSON.parse(readFileSync(new URL("event_map.json", feelRoot), "utf8"));
 const playedIds = [...new Set([...html.matchAll(/audioBus\.play\("([^"]+)"\)/g)].map((m) => m[1]))];
-assert.ok(playedIds.length >= 3, "the shell still plays at least the three P8 gameplay sounds");
+assert.deepEqual(
+  playedIds.sort(),
+  audioMap.events.map((event)=>event.id).sort(),
+  "the shell schedules every mapped gameplay event"
+);
 const mappedIds = new Set(audioMap.events.map((event) => event.id));
 for (const id of playedIds) {
   assert.ok(mappedIds.has(id), `audioBus.play("${id}") resolves to an event in event_map.json`);

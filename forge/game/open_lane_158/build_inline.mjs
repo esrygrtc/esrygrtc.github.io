@@ -1,4 +1,5 @@
 #!/usr/bin/env node
+import { createHash } from "node:crypto";
 import { readFileSync, readdirSync, writeFileSync } from "node:fs";
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
@@ -12,13 +13,32 @@ const outFlag = process.argv.indexOf("--out");
 const outputPath = outFlag >= 0 ? process.argv[outFlag + 1] : join(root, "playable.html");
 const feelRoot = join(root, "../../game/design/motion/issue_158_open_lane");
 const timing = JSON.parse(readFileSync(join(feelRoot, "timing.json"), "utf8"));
-const audioEvents = JSON.parse(readFileSync(join(feelRoot, "event_map.json"), "utf8"));
-const inlineAudio = Object.fromEntries(
-  audioEvents.events.map((event) => [
-    event.id,
-    `data:audio/mpeg;base64,${readFileSync(join(root, "audio", event.file)).toString("base64")}`,
-  ])
-);
+const eventMapPath = join(feelRoot, "event_map.json");
+const eventMapBytes = readFileSync(eventMapPath);
+const audioEvents = JSON.parse(eventMapBytes);
+const audioManifest = JSON.parse(readFileSync(join(root, "audio", "manifest.json"), "utf8"));
+const audioItems = [...audioEvents.events, ...(audioEvents.music ? [audioEvents.music] : [])];
+const audioIds = audioItems.map((item) => item.id);
+if (new Set(audioIds).size !== audioIds.length) throw new Error("Audio event ids must be unique");
+const eventMapHash = createHash("sha256").update(eventMapBytes).digest("hex");
+if (audioManifest.event_map_sha256 !== eventMapHash) {
+  throw new Error(`Audio manifest event_map_sha256 mismatch: expected ${eventMapHash}, got ${audioManifest.event_map_sha256}`);
+}
+const manifestIds = Object.keys(audioManifest.assets).sort();
+if (JSON.stringify([...audioIds].sort()) !== JSON.stringify(manifestIds)) {
+  throw new Error(`Audio manifest ids mismatch: map=${[...audioIds].sort().join(",")} manifest=${manifestIds.join(",")}`);
+}
+const inlineAudio = {};
+for (const item of audioItems) {
+  const entry = audioManifest.assets[item.id];
+  if (entry.file !== item.file) throw new Error(`Audio file mismatch for ${item.id}: map=${item.file} manifest=${entry.file}`);
+  const bytes = readFileSync(join(root, "audio", item.file));
+  const hash = createHash("sha256").update(bytes).digest("hex");
+  if (entry.sha256 !== hash || entry.bytes !== bytes.length) {
+    throw new Error(`Audio delivery mismatch for ${item.id}: expected ${entry.sha256}/${entry.bytes}, got ${hash}/${bytes.length}`);
+  }
+  inlineAudio[item.id] = `data:audio/mpeg;base64,${bytes.toString("base64")}`;
+}
 // #160: readdirSync replaces hardcoded map — manifest asserts completeness
 const manifest = JSON.parse(readFileSync(join(artPath, "manifest.json"), "utf8"));
 const manifestSet = new Set([...manifest.blocks, ...manifest.doors, ...manifest.settings, ...manifest.legacy]);
